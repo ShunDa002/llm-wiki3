@@ -88,5 +88,6 @@ git tag -f last-accepted            # optional moving marker for procedure 6
 
 ## Quarterly re-drill
 
-Re-run all six procedures and update the date at the top. A documented but untested recovery
+`docs/phase-0/recovery-test.md` is kept committed as the drill target — the file to corrupt and
+delete next time. Re-run all six procedures against it and update the date at the top. A documented but untested recovery
 procedure is an assumption, not a control.
