@@ -7,7 +7,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 fx=$(mktemp -d)
 trap 'rm -r -- "$fx"' EXIT
 mkdir -p "$fx/scripts" "$fx/wiki/concepts" "$fx/okf/decisions" "$fx/okf/experiments" "$fx/raw"
-cp "$here/baseline-metrics.sh" "$fx/scripts/"
+cp "$here/baseline-metrics.sh" "$here/lib-vault.sh" "$fx/scripts/"
 
 # Spaces in filenames are deliberate: they broke the link graph once already.
 printf -- '---\nsources:\n  - "[[Source - A]]"\n---\nLinks [[Concept B]] and [[Missing Page]].\n' \
