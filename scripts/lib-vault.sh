@@ -5,6 +5,14 @@
 # Knowledge pages. Excludes docs/, templates/, scripts/ — process documents, not knowledge.
 notes() { find wiki okf raw -type f -name '*.md' 2>/dev/null | sort; }
 
+# Wiki factual pages only, excluding wiki/sources/ (provenance IS the page), index, and log.
+# Use this for the "every factual page cites sources" check — okf/ pages cite via
+# knowledge_basis/informed_by instead, and raw/ files are the evidence, not a citation of it.
+# Scanning all of wiki+okf+raw for a `sources:` field flagged 10 false positives once already.
+wiki_pages() {
+  notes | grep '^wiki/' | grep -v '^wiki/sources/' | grep -vE '^wiki/(index|log)\.md$'
+}
+
 count() { grep -c . || true; }
 
 # Every wikilink as "<source file><TAB><target basename>".

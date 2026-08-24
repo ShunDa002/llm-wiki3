@@ -26,11 +26,11 @@ done <<< "$graph"
 
 echo
 echo "-- missing source links --"
-# Factual pages must say where their claims came from. Index, log and source pages are exempt.
+# Wiki factual pages must say where their claims came from. okf/ cites via knowledge_basis or
+# informed_by instead (checked separately below); raw/ is the evidence, not a citation of it.
 while IFS= read -r f; do
-  case "$f" in wiki/index.md|wiki/log.md|wiki/sources/*|raw/*|*/.gitkeep) continue ;; esac
   has_field "$f" sources || report "no-sources" "$f"
-done < <(notes)
+done < <(wiki_pages)
 
 echo
 echo "-- duplicate concepts --"

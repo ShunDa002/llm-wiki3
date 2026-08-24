@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-raw.sh\"",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-raw.sh\"",
             "timeout": 10,
             "statusMessage": "Checking raw/ write guard"
           }

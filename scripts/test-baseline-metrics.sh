@@ -18,7 +18,7 @@ printf -- '---\ntitle: D1\n---\nNo basis.\n'                  > "$fx/okf/decisio
 printf -- '---\ntitle: E1\n---\n## Conclusion\nDone.\n'       > "$fx/okf/experiments/EXP-0001.md"
 printf -- '---\ntitle: E2\n---\nStill running.\n'             > "$fx/okf/experiments/EXP-0002.md"
 
-out=$("$fx/scripts/baseline-metrics.sh")
+out=$(bash "$fx/scripts/baseline-metrics.sh")
 fail=0
 check() { # label expected regex
   if grep -qE "$2" <<< "$out"; then
@@ -30,7 +30,7 @@ check() { # label expected regex
 }
 
 check "6 notes"                  '^Notes \(wiki/ \+ okf/ \+ raw/\) +: 6$'
-check "5 notes without sources"  '^Notes without a sources: field +: 5$'
+check "1 note without sources"   '^Notes without a sources: field +: 1$'
 check "1 duplicate filename"     '^Duplicate note filenames +: 1$'
 check "2 broken wikilinks"       '^Broken internal wikilinks +: 2$'
 check "5 orphans"                '^Orphan notes \(no inbound link\) +: 5$'

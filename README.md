@@ -47,8 +47,8 @@ llm-wiki3/
 ## Common commands
 
 ```bash
-scripts/baseline-metrics.sh        # vault health counts
-scripts/test-baseline-metrics.sh   # verify the metrics logic still works
+bash scripts/baseline-metrics.sh        # vault health counts
+bash scripts/test-baseline-metrics.sh   # verify the metrics logic still works
 git status                         # what changed
 git diff                           # line-level changes
 ```

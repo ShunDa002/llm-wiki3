@@ -57,5 +57,5 @@ run onward.
 Re-run with:
 
 ```bash
-scripts/baseline-metrics.sh
+bash scripts/baseline-metrics.sh
 ```

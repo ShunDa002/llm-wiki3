@@ -46,7 +46,7 @@ printf -- '---\ntitle: EXP-0002\nstatus: complete\nsources: []\n---\n## Conclusi
 printf -- '---\ntitle: Wiki Index\n---\n# Index\n\nNothing listed.\n' > "$fx/wiki/index.md"
 printf -- '---\ntitle: Operation Log\n---\n# Log\n' > "$fx/wiki/log.md"
 
-out=$(cd "$fx" && scripts/wiki-lint.sh)
+out=$(cd "$fx" && bash scripts/wiki-lint.sh)
 rc=$?
 
 fail=0

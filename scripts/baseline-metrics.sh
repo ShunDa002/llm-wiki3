@@ -10,12 +10,12 @@ cd "$(dirname "$0")/.."
 
 total=$(notes | count)
 
-# Notes with a body claim but no sources: field. Source pages and index/log are exempt.
+# Wiki factual pages with a body claim but no sources: field. See wiki_pages() for scope —
+# okf/ and raw/ legitimately don't use this field and were false-positiving here.
 no_sources=0
 while IFS= read -r f; do
-  case "$f" in */sources/*|*/index.md|*/log.md) continue ;; esac
   has_field "$f" sources || no_sources=$((no_sources + 1))
-done < <(notes)
+done < <(wiki_pages)
 
 dupes=$(notes | sed 's#.*/##' | sort | uniq -d | count)
 

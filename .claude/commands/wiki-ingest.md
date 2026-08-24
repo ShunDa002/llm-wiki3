@@ -1,7 +1,7 @@
 ---
 description: Integrate one raw source into the Wiki as a reviewed transaction
 argument-hint: <path under raw/>
-allowed-tools: Read, Grep, Glob, Write, Edit, Bash(sha256sum:*), Bash(git status:*), Bash(git diff:*), Bash(scripts/wiki-lint.sh)
+allowed-tools: Read, Grep, Glob, Write, Edit, Bash(sha256sum:*), Bash(git status:*), Bash(git diff:*), Bash(bash scripts/wiki-lint.sh)
 ---
 
 Ingest `$1` into the Wiki. This is a transaction: plan, get approval, execute exactly the plan.
@@ -96,7 +96,7 @@ present a revised plan.
 
 ## Step E — hand off for review
 
-Run `scripts/wiki-lint.sh` and `git status --short`, then tell the reviewer to check:
+Run `bash scripts/wiki-lint.sh` and `git status --short`, then tell the reviewer to check:
 
 - No file under `raw/` changed
 - New pages are distinct, not duplicates

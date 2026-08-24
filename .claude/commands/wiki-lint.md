@@ -1,9 +1,11 @@
 ---
 description: Report vault health findings. Recommends, never repairs.
-allowed-tools: Read, Grep, Glob, Bash(scripts/wiki-lint.sh), Bash(scripts/baseline-metrics.sh), Bash(git status:*)
+allowed-tools: Read, Grep, Glob, Bash(bash scripts/wiki-lint.sh), Bash(bash scripts/baseline-metrics.sh), Bash(git status:*)
 ---
 
-Run `scripts/wiki-lint.sh`, then interpret the output.
+Run `bash scripts/wiki-lint.sh`, then interpret the output. Invoke it through `bash`, not by
+path — this environment does not reliably track the executable bit (`core.fileMode: false`), so
+a script that looks runnable in this session can come back as `100644` after a fresh checkout.
 
 The script covers what a script can check reliably:
 
