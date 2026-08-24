@@ -1,0 +1,11 @@
+# Obsidian per-machine state; the vault content is what matters.
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+
+# Agent-local overrides. Project settings (.claude/settings.json) stay committed.
+.claude/settings.local.json
+
+# Temporary agent output. Reports belong outside the vault or under docs/.
+tmp/
+*.tmp

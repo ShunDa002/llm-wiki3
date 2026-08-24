@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "deny": [
+      "Write(./raw/**)",
+      "Edit(./raw/**)",
+      "Write(./LLM-Wiki-and-OKF-Implementation-Plan.md)",
+      "Bash(git push:*)",
+      "Bash(rm -rf:*)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(git restore:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Write(./templates/**)",
+      "Edit(./templates/**)",
+      "Write(./okf/**)",
+      "Edit(./okf/**)",
+      "Edit(./CLAUDE.md)",
+      "Edit(./.claude/settings.json)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-raw.sh\"",
+            "timeout": 10,
+            "statusMessage": "Checking raw/ write guard"
+          }
+        ]
+      }
+    ]
+  }
+}
