@@ -77,7 +77,11 @@ command_hits_evidence() { # <command string>
   # returns non-zero, so a single-segment command (the common case) was never examined at all.
   hits=$(printf '%s\n' "$cmd" | tr ';|&' '\n\n\n' | while IFS= read -r seg; do
     [ -z "$seg" ] && continue
-    printf '%s' "$seg" | grep -qE "(^|[^A-Za-z0-9_./-])$EVIDENCE_DIR/" || continue
+    # Boundary excludes word characters but NOT `/` or `.`, so an ordinary absolute or
+    # variable-interpolated path — "$VAULT/raw/x", ./raw/x — is still caught. Excluding `/`
+    # here (as the original Claude-only hook does) means any absolute path walks straight
+    # through the guard, which is not obfuscation, just normal shell usage.
+    printf '%s' "$seg" | grep -qE "(^|[^A-Za-z0-9_-])$EVIDENCE_DIR/" || continue
     if printf '%s' "$seg" | grep -qE ">>?[[:space:]]*[^[:space:]]*$EVIDENCE_DIR/" ||
        printf '%s' "$seg" | grep -qE "$mutators" ||
        printf '%s' "$seg" | grep -qE '(sed|perl)[[:space:]]+[^;]*-i'; then

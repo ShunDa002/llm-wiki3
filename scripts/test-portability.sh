@@ -44,6 +44,16 @@ expect_allow_cmd 'rm /tmp/junk'
 expect_allow_cmd 'rm -rf /tmp/clone && grep -c . raw/articles/x.md'
 expect_allow_cmd 'mkdir -p /tmp/out; wc -l raw/notes/a.md'
 
+# Regression: an absolute or variable-interpolated path must not walk through the guard. The
+# original boundary treated `/` as a word character, so "$VAULT/raw/x" evaded detection
+# entirely — found by an actual tamper attempt, not by reading the regex.
+expect_deny_cmd 'printf x > /c/Data/llm-wiki3/raw/.gitkeep'
+expect_deny_cmd 'printf x > "$VAULT/raw/a.md"'
+expect_deny_cmd 'rm ./raw/articles/x.md'
+expect_deny_cmd 'sed -i s/a/b/ /abs/vault/raw/x.md'
+expect_allow_cmd 'cat /c/Data/llm-wiki3/raw/articles/x.md'
+expect_allow_cmd 'rm /tmp/scratch/rawdata.md'   # 'raw' as a name fragment, not the dir
+
 # ------------------------------------------------------------ guard: JSON mode
 json_deny() { # <payload> <label>
   out=$(printf '%s' "$1" | bash "$G" --stdin-json --format json 2>/dev/null)
