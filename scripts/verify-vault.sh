@@ -97,6 +97,20 @@ else
   note "scripts/check-policy-sync.sh not found — skipping"
 fi
 
+# --- 5. workflow command pointers still thin and permitted -----------------
+echo
+echo "-- command pointer integrity --"
+if [ -f scripts/check-command-pointers.sh ]; then
+  if ptr_out=$(bash scripts/check-command-pointers.sh 2>&1); then
+    pass "command files are thin pointers with adequate tool permissions"
+  else
+    fail "command/prompt pointer problem:"
+    printf '%s\n' "$ptr_out" | sed 's/^/      /'
+  fi
+else
+  note "scripts/check-command-pointers.sh not found — skipping"
+fi
+
 echo
 if [ "$problems" -eq 0 ]; then
   echo "All clear."

@@ -81,20 +81,35 @@ agent "read AGENTS.md and follow it" at the start of the session.
 
 ## Workflows without slash commands
 
-`/wiki-ingest`, `/wiki-query`, and `/wiki-lint` are Claude Code slash commands. The same workflows
-live agent-neutrally in `prompts/`:
+`prompts/wiki-{ingest,query,lint}.md` is the **canonical, single-sourced** definition of each
+workflow. `.claude/commands/*.md` are thin pointers into it — frontmatter (Claude's
+`description`/`allowed-tools`) plus one line: *"Follow `prompts/<name>.md`."* There is exactly one
+place workflow content lives; `/wiki-ingest` under Claude Code and *"follow
+prompts/wiki-ingest.md"* under any other agent run the identical steps, because they're the same
+file.
 
-| Workflow | Portable definition | Claude Code equivalent |
+| Workflow | Canonical definition | Claude Code entry point |
 |---|---|---|
-| Ingest | `prompts/wiki-ingest.md` | `/wiki-ingest` |
-| Query | `prompts/wiki-query.md` | `/wiki-query` |
-| Lint | `prompts/wiki-lint.md` | `/wiki-lint` |
+| Ingest | `prompts/wiki-ingest.md` | `/wiki-ingest` (pointer) |
+| Query | `prompts/wiki-query.md` | `/wiki-query` (pointer) |
+| Lint | `prompts/wiki-lint.md` | `/wiki-lint` (pointer) |
 
-Under another agent: *"Follow prompts/wiki-ingest.md for raw/articles/01-example.md."* The
-`.claude/commands/` files are untouched and remain authoritative for Claude Code.
+Under another agent: *"Follow prompts/wiki-ingest.md for raw/articles/01-example.md."*
 
-The two sets are near-identical today. If you edit one, edit the other — there is no automated
-sync check for the prompts, only for the policy files. See the honesty note below.
+**Why this replaced two independent copies:** the first version of this portability layer kept
+`prompts/` and `.claude/commands/` as separate, hand-synced files. It drifted within one session
+— `prompts/wiki-lint.md` grew a `verify-vault.sh` step that never made it back into
+`.claude/commands/wiki-lint.md`, so Claude Code's own `/wiki-lint` was silently missing the check
+that mattered most for portability (whether the enforcement layer was even armed). Detecting that
+kind of drift after the fact is strictly worse than making it structurally impossible, so the
+duplication was collapsed instead of patched.
+
+One seam remains, unavoidably: Claude's `allowed-tools` permission list is mechanism, not
+workflow content, and no other agent has an equivalent syntax to unify it against — it has to
+keep living in the command file. `scripts/check-command-pointers.sh` (wired into
+`verify-vault.sh`) checks that every script a prompt actually invokes is covered by the matching
+command's `allowed-tools`, and that no command file has silently re-grown its own prose instead
+of pointing at the prompt.
 
 ## Wiring a pre-tool guard for a new agent
 
@@ -132,9 +147,11 @@ legitimate work teaches the operator to route around it, which is worse than no 
    `scripts/check-policy-sync.sh` checks that ~16 invariant rules and the phase number appear in
    both, and `verify-vault.sh` runs it. It compares rules, not prose — wording may differ freely.
    It will not catch a *changed* rule that keeps its keyword.
-2. **The `prompts/` and `.claude/commands/` duplication has no sync check.** Same cause,
-   accepted deliberately; a checker for prose workflows would be more false positives than value.
-   Edit both.
+2. **`.claude/commands/*.md`'s `allowed-tools` list can still fall out of step** with what
+   `prompts/*.md` actually invokes — the one seam the pointer refactor couldn't remove, since
+   Claude's permission syntax has no equivalent to unify against. `check-command-pointers.sh`
+   guards this narrowly (does the command still point at the prompt; does allowed-tools cover
+   every script the prompt invokes), not by diffing prose.
 3. **The pre-commit hook is bypassable** with `git commit --no-verify`, on purpose: the pilot
    owner legitimately needs to correct a mis-captured source. It is a control against agent
    error, not a control against a determined human.
@@ -144,7 +161,7 @@ legitimate work teaches the operator to route around it, which is worse than no 
 5. **Nothing here protects against an agent with no hooks and no shell.** In that mode the vault
    is policy-only, which `AGENTS.md` says plainly rather than implying safety that isn't there.
 
-## Files added
+## Files added or restructured
 
 ```
 AGENTS.md                          canonical, agent-neutral policy
@@ -152,12 +169,19 @@ GEMINI.md                          Gemini entry point (pointer)
 .github/copilot-instructions.md    Copilot entry point (pointer)
 .cursor/rules/vault-policy.mdc     Cursor entry point (pointer)
 .githooks/pre-commit               portable enforcement backstop
-prompts/wiki-{ingest,query,lint}.md   agent-neutral workflows
+prompts/wiki-{ingest,query,lint}.md   canonical, single-sourced workflows
+.claude/commands/wiki-{ingest,query,lint}.md   restructured into thin pointers at prompts/
 scripts/guard-raw-universal.sh     reusable pre-tool guard core
 scripts/verify-vault.sh            agent-independent verification
-scripts/check-policy-sync.sh       policy-drift detector
-scripts/test-portability.sh        self-check for all of the above
+scripts/check-policy-sync.sh       policy-drift detector (AGENTS.md vs CLAUDE.md)
+scripts/check-command-pointers.sh  command-pointer drift detector (commands vs prompts)
+scripts/test-portability.sh        self-check for all of the above, 35 checks
 docs/agent-portability.md          this file
 ```
 
-Nothing existing was modified. Verify with `git status` — every path above is new.
+Everything above is new **except** `.claude/commands/*.md`, which were restructured from full
+duplicates into pointers — a behavior-preserving change (Claude still ends up following the same
+instructions, one hop away) made after the original "add without modifying" constraint was
+revisited, because the duplication it required was the thing actually failing to hold up over
+time. No other pre-existing file was touched. Verify with `git diff` against any commit before
+this restructuring — every other path is unchanged.

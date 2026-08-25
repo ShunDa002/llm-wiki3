@@ -148,5 +148,48 @@ else
 fi
 rm -r -- "$d"
 
+# --------------------------------------------------- command-pointer drift detection
+# Real command files must currently be thin pointers with adequate tool permissions.
+if bash "$here/check-command-pointers.sh" >/dev/null 2>&1; then
+  ok "command pointers: live files are thin and permitted correctly"
+else
+  bad "command pointers: live .claude/commands/*.md have drifted from prompts/*.md"
+fi
+
+# Detector must fire when a command file is re-forked into a full copy.
+d=$(mktemp -d)
+mkdir -p "$d/scripts" "$d/prompts" "$d/.claude/commands"
+cp "$here/check-command-pointers.sh" "$d/scripts/"
+cp "$root/prompts/wiki-lint.md" "$d/prompts/"
+cp "$root/prompts/wiki-ingest.md" "$d/prompts/"
+cp "$root/prompts/wiki-query.md" "$d/prompts/"
+cp "$root/.claude/commands/wiki-ingest.md" "$d/.claude/commands/"
+cp "$root/.claude/commands/wiki-query.md" "$d/.claude/commands/"
+# Simulate exactly what happened before this refactor: the command file re-grows its own
+# "## Step" content instead of pointing at the prompt.
+{ echo "---"; echo "allowed-tools: Read"; echo "---"; echo; cat "$root/prompts/wiki-lint.md"; } \
+  > "$d/.claude/commands/wiki-lint.md"
+if (cd "$d" && bash scripts/check-command-pointers.sh >/dev/null 2>&1); then
+  bad "command pointers: did NOT detect a re-forked command file"
+else
+  ok "command pointers: detects a re-forked command file"
+fi
+rm -r -- "$d"
+
+# Detector must fire when allowed-tools no longer covers what the prompt invokes.
+d=$(mktemp -d)
+mkdir -p "$d/scripts" "$d/prompts" "$d/.claude/commands"
+cp "$here/check-command-pointers.sh" "$d/scripts/"
+cp "$root/prompts/"*.md "$d/prompts/"
+cp "$root/.claude/commands/"*.md "$d/.claude/commands/"
+sed '/allowed-tools:/s/, Bash(bash scripts\/verify-vault\.sh)//' \
+  "$root/.claude/commands/wiki-lint.md" > "$d/.claude/commands/wiki-lint.md"
+if (cd "$d" && bash scripts/check-command-pointers.sh >/dev/null 2>&1); then
+  bad "command pointers: did NOT detect a missing tool permission"
+else
+  ok "command pointers: detects a missing tool permission"
+fi
+rm -r -- "$d"
+
 echo
 [ "$fail" -eq 0 ] && { echo PASS; exit 0; } || { echo FAILED; exit 1; }
