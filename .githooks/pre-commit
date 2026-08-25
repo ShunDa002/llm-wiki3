@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Portable raw/ immutability backstop. Agent-independent by design: this fires for Claude,
+# Codex, Gemini, Copilot, a plain editor, or a human at the terminal, because Git runs it and
+# Git does not care what produced the change.
+#
+# Arm with:  git config core.hooksPath .githooks
+# Verify:    bash scripts/verify-vault.sh
+#
+# Blocks a commit that modifies, renames, or deletes anything already tracked under raw/.
+# ALLOWS adding new files under raw/ — capturing new evidence is the pilot owner's normal job,
+# and the policy protects existing evidence from mutation, not the folder from ever growing.
+set -uo pipefail
+
+EVIDENCE_DIR="raw"
+
+# Staged changes against HEAD, name-status. On the very first commit there is no HEAD, so
+# compare against the empty tree instead of failing open.
+if git rev-parse --verify -q HEAD >/dev/null; then
+  base=HEAD
+else
+  base=$(git hash-object -t tree /dev/null)
+fi
+
+# Mutations to protect against: Modified, Deleted, Renamed, Copied-over, Type-changed.
+# Added (A) is deliberately not in this list.
+violations=$(git diff --cached --name-status --diff-filter=MDRCT "$base" -- "$EVIDENCE_DIR" || true)
+
+if [ -n "$violations" ]; then
+  cat >&2 <<EOF
+COMMIT BLOCKED — evidence immutability violation
+
+$EVIDENCE_DIR/ is immutable evidence. The following staged changes modify, delete, or rename
+files that are already tracked there:
+
+$violations
+
+Per AGENTS.md, evidence may be added but never altered. Adding new files is allowed; the
+changes above are not.
+
+If this was an agent error:
+  git restore --staged --worktree -- $EVIDENCE_DIR/
+
+If the pilot owner genuinely intends this (correcting a mis-captured source, for example),
+this is a high-risk human operation. Bypass deliberately and on the record:
+  git commit --no-verify
+
+Nothing has been committed.
+EOF
+  exit 1
+fi
+
+exit 0
