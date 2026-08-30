@@ -99,6 +99,66 @@ for f in wiki/syntheses/*.md; do
 done
 
 echo
+echo "-- recorded contradictions without disputed status --"
+# Phase 2.6: a new source may confirm, qualify, supersede, or contradict. When a page records an
+# actual contradiction, knowledge_status must say so — otherwise the disagreement is visible to a
+# human reading the page but invisible to every query, filter, and impact report.
+# A recorded contradiction always names both sides with wikilinks (ingest step D.3), so a
+# Contradictions section with no wikilink is template boilerplate, not a finding. An explicit
+# "None recorded." is also not a finding even when the paragraph goes on to link something else —
+# a real vault page does exactly that, which is how this exemption earned its way in.
+while IFS= read -r f; do
+  body=$(awk '/^#+ *[Cc]ontradiction/{f=1;next} /^#+ /{f=0} f' "$f")
+  grep -q '\[\[' <<< "$body" || continue
+  grep -qi '^ *none recorded' <<< "$body" && continue
+  [ "$(frontmatter "$f" knowledge_status)" = "disputed" ] ||
+    report "contradiction-not-disputed" "$f records a contradiction but knowledge_status is '$(frontmatter "$f" knowledge_status)'"
+done < <(wiki_pages)
+
+echo
+echo "-- incomplete claim blocks --"
+# Phase 2.4: a structured claim block exists to make a high-value claim auditable. A block missing
+# its scope or its review date is worse than prose — it looks rigorous without being it.
+while IFS= read -r f; do
+  grep -qE '^#+ *Claim *$' "$f" || continue
+  for sub in Support Scope Confidence 'Last reviewed'; do
+    grep -qE "^#+ *$sub" "$f" || report "claim-block-incomplete" "$f: claim block has no '$sub' section"
+  done
+done < <(wiki_pages)
+
+echo
+echo "-- wikilinks broken across a line --"
+# A wikilink wrapped onto the next line renders in Obsidian but is invisible to every link-based
+# check here, because the link graph is built line by line. The result is a link that looks present
+# to a human and does not exist to lint: no broken-link finding, no inbound-link credit, no orphan
+# detection. One such link was already live in this vault when this check was written.
+while IFS=: read -r f n _; do
+  [ -n "${f:-}" ] || continue
+  report "wrapped-wikilink" "$f line $n — wikilink not closed on the same line"
+done < <(notes | while IFS= read -r f; do grep -Hn '\[\[[^]]*$' "$f" 2>/dev/null; done)
+
+echo
+echo "-- index bloat --"
+# Phase 2.7: the index is a routing layer, not a content replica. Two ways it stops routing:
+# it grows toward one entry per page, or it links past the knowledge layer into raw evidence.
+INDEX_LINK_CAP=25
+if [ -f wiki/index.md ]; then
+  n=$(grep -o '\[\[[^]]*\]\]' wiki/index.md | grep -c . || true)
+  [ "$n" -gt "$INDEX_LINK_CAP" ] &&
+    report "index-bloat" "wiki/index.md has $n links (cap $INDEX_LINK_CAP) — it is becoming a table of contents"
+  # Process substitution, not a pipe: report() increments a counter, and a pipeline would run it
+  # in a subshell where the increment is discarded.
+  while IFS= read -r tgt; do
+    [ -n "$tgt" ] || continue
+    path=$(notes | grep -F "/$tgt.md" | head -1)
+    case "$path" in
+      wiki/sources/*) report "index-links-source" "wiki/index.md links [[$tgt]] — cite sources from concepts, not the index" ;;
+      raw/*)          report "index-links-raw"    "wiki/index.md links [[$tgt]] in raw/ — the index routes to knowledge, not evidence" ;;
+    esac
+  done < <(awk -F'\t' '$1 == "wiki/index.md" {print $2}' <<< "$graph" | sort -u)
+fi
+
+echo
 if [ "$findings" -eq 0 ]; then
   echo "No findings."
   exit 0

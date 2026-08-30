@@ -17,7 +17,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-WORKFLOWS="wiki-ingest wiki-query wiki-lint"
+WORKFLOWS="wiki-ingest wiki-query wiki-lint wiki-find-duplicates wiki-trace"
 problems=0
 report() { printf 'PROBLEM: %s\n' "$1"; problems=$((problems + 1)); }
 
@@ -43,7 +43,9 @@ for name in $WORKFLOWS; do
   allowed=$(grep -m1 '^allowed-tools:' "$cmd" || true)
   while IFS= read -r script; do
     [ -z "$script" ] && continue
-    if ! grep -qF "Bash(bash scripts/$script)" <<< "$allowed"; then
+    # Prefix match, not exact: a script that takes an argument needs `Bash(bash scripts/x.sh:*)`,
+    # and requiring the bare form would reject the only entry that actually works.
+    if ! grep -qF "Bash(bash scripts/$script" <<< "$allowed"; then
       report "$prompt invokes 'bash scripts/$script' but $cmd's allowed-tools does not permit it"
     fi
   done < <(grep -oE 'bash scripts/[A-Za-z0-9_.-]+\.sh' "$prompt" | sed 's#bash scripts/##' | sort -u)

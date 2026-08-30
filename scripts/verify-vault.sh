@@ -68,6 +68,29 @@ else
   fi
 fi
 
+# --- 2b. content drift against recorded source_id --------------------------
+# git status alone is blind to a file that was mutated *before* its first-ever commit — it
+# reports that as a plain "Added" file, not a modification, so the check above lets it through.
+# Compare against the source_id already recorded on the matching wiki/sources/ page instead,
+# which exists independently of git history. This is what actually caught commit f38689b.
+if [ -d "$EVIDENCE_DIR" ] && [ -d wiki/sources ] && [ -f scripts/lib-vault.sh ]; then
+  . scripts/lib-vault.sh
+  drift=0
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    recorded=$(recorded_source_id "$path")
+    [ -n "$recorded" ] || continue
+    actual=$(sha256sum "$path" 2>/dev/null | cut -d' ' -f1)
+    if [ "$actual" != "$recorded" ]; then
+      fail "content drift: $path no longer matches its recorded source_id"
+      note "  recorded: $recorded"
+      note "  actual:   $actual"
+      drift=1
+    fi
+  done < <(find "$EVIDENCE_DIR" -type f -name '*.md')
+  [ "$drift" -eq 0 ] && pass "no content drift against recorded source_id"
+fi
+
 # --- 3. structural lint ----------------------------------------------------
 echo
 echo "-- structural lint --"
@@ -109,6 +132,36 @@ if [ -f scripts/check-command-pointers.sh ]; then
   fi
 else
   note "scripts/check-command-pointers.sh not found — skipping"
+fi
+
+# --- 6. schema conformance (Phase 2) --------------------------------------
+echo
+echo "-- schema conformance --"
+if [ -f scripts/check-schema.sh ]; then
+  if schema_out=$(bash scripts/check-schema.sh 2>&1); then
+    pass "every page matches the approved metadata schema"
+  else
+    fail "schema findings:"
+    printf '%s\n' "$schema_out" | grep -vE '^$|^SCHEMA|^Vault:' | sed 's/^/      /'
+  fi
+else
+  note "scripts/check-schema.sh not found — skipping"
+fi
+
+# --- 7. duplicate candidates (Phase 2, advisory) --------------------------
+# Advisory on purpose: a title collision is a question for a human, not a broken vault. Failing
+# the run on it would mean every legitimate concept/counterclaim pair blocks write work.
+echo
+echo "-- duplicate candidates (advisory) --"
+if [ -f scripts/find-duplicates.sh ]; then
+  if dup_out=$(bash scripts/find-duplicates.sh 2>&1); then
+    pass "no duplicate candidates"
+  else
+    printf 'note  %s\n' "possible duplicates — review, never auto-merge:"
+    printf '%s\n' "$dup_out" | grep -E '^(key-collision|similar-title)' | sed 's/^/      /'
+  fi
+else
+  note "scripts/find-duplicates.sh not found — skipping"
 fi
 
 echo

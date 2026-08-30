@@ -1,7 +1,7 @@
 ---
 description: Integrate one raw source into the Wiki as a reviewed transaction
 argument-hint: <path under raw/>
-allowed-tools: Read, Grep, Glob, Write, Edit, Bash(sha256sum:*), Bash(git status:*), Bash(git diff:*), Bash(bash scripts/verify-vault.sh)
+allowed-tools: Read, Grep, Glob, Write, Edit, Bash(sha256sum:*), Bash(git status:*), Bash(git diff:*), Bash(bash scripts/verify-vault.sh), Bash(bash scripts/find-duplicates.sh:*)
 ---
 
 Follow `prompts/wiki-ingest.md` for this input path: `$1`

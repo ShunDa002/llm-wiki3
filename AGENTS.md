@@ -3,11 +3,14 @@
 Canonical, agent-neutral operating policy for the LLM Wiki + OKF pilot vault. This file is the
 single source of truth for *what the rules are*. Read it before any write operation.
 
-Phase: **1 (MVP minimum closed loop)**. Automation level: **1 to 2** — the agent proposes plans
-and executes approved ones.
+Phase: **2 (schema stabilization and quality control)**. Automation level: **2** — the agent
+proposes plans and executes approved ones.
 
 Read [docs/phase-0/risk-matrix.md](docs/phase-0/risk-matrix.md) before any write operation and
 [docs/phase-0/privacy-policy.md](docs/phase-0/privacy-policy.md) before handling any source.
+Read [docs/phase-2/page-taxonomy.md](docs/phase-2/page-taxonomy.md) before creating any page — it
+decides which page type a thing is, and picking the wrong one is the fragmentation failure Phase 2
+exists to stop.
 
 > **If you are Claude Code:** `CLAUDE.md` is your entry point and says the same thing. The two
 > files are kept in agreement by `scripts/check-policy-sync.sh`. If they ever disagree, **this
@@ -31,14 +34,20 @@ Read [docs/phase-0/risk-matrix.md](docs/phase-0/risk-matrix.md) before any write
 - Prefer updating an existing concept over creating a duplicate.
 - Never remove conflicting information silently.
 - Append all completed operations to `wiki/log.md`.
+- Run `bash scripts/find-duplicates.sh "<Proposed Title>"` before proposing any new page.
+- A source that states no claim gets a page in `wiki/questions/`, not a concept page.
+- Set `knowledge_status` deliberately. A page that records a contradiction must say `disputed`;
+  a newer source does not overwrite an older claim, it changes the relationship between them.
 
-The three workflows are defined agent-neutrally in `prompts/`:
+The workflows are defined agent-neutrally in `prompts/`:
 
 | Workflow | Definition | Purpose |
 |---|---|---|
 | ingest | `prompts/wiki-ingest.md` | Integrate one raw source as a reviewed transaction |
 | query | `prompts/wiki-query.md` | Answer from vault knowledge, with citations |
 | lint | `prompts/wiki-lint.md` | Report health findings; never repair |
+| find-duplicates | `prompts/wiki-find-duplicates.md` | Report duplicate candidates; never merge |
+| trace | `prompts/wiki-trace.md` | Walk a claim back to raw evidence; read-only |
 
 Each declares its own minimum tool set; do not reach past it.
 
@@ -77,15 +86,24 @@ Each declares its own minimum tool set; do not reach past it.
 Fields exist to support retrieval, governance, or automation. Add none beyond these without
 approval — schema change is high-risk. Full forms live in `templates/`.
 
-Concept: `title, type, status, classification, tags, sources, created, updated, confidence`
+Concept: `title, type, status, classification, tags, sources, created, updated, confidence, knowledge_status` — optional: `aliases, review_needed`
 Source: `title, type, raw_file, source_id, source_kind, author, classification, captured, ingested, status`
-Synthesis: `title, type, status, classification, sources, based_on, created, updated, confidence`
+Synthesis: `title, type, status, classification, tags, sources, based_on, created, updated, confidence, knowledge_status` — optional: `aliases, review_needed`
+Question: `title, type, status, classification, created, updated` — optional: `tags, sources, answered_by`
 Project: `title, type, status, classification, owner, started, review_date, informed_by`
 Decision: `title, type, status, classification, project, decision_date, review_date, knowledge_basis, validated_by`
 Experiment: `title, type, status, classification, project, tests_decision, started, completed`
 
 `source_id` is `sha256sum` of the raw file. It is what makes re-ingest detectable, so it is not
 optional.
+
+`status` describes the page; `knowledge_status` describes the claim — `current | disputed |
+superseded | uncertain`. They are different fields answering different questions, and collapsing
+them loses the ability to ask "which active pages rest on disputed knowledge".
+
+`scripts/check-schema.sh` enforces this list mechanically, including rejecting fields that are
+**not** on it. An unapproved field is a finding, not a convenience: schema creep is how a minimum
+schema turns into three dialects nobody can query.
 
 ## Approval model
 

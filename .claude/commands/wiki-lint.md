@@ -1,6 +1,6 @@
 ---
 description: Report vault health findings. Recommends, never repairs.
-allowed-tools: Read, Grep, Glob, Bash(bash scripts/wiki-lint.sh), Bash(bash scripts/verify-vault.sh), Bash(git status:*)
+allowed-tools: Read, Grep, Glob, Bash(bash scripts/wiki-lint.sh), Bash(bash scripts/check-schema.sh), Bash(bash scripts/find-duplicates.sh:*), Bash(bash scripts/verify-vault.sh), Bash(git status:*)
 ---
 
 Follow `prompts/wiki-lint.md`.

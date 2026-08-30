@@ -3,6 +3,7 @@ title: <Synthesis Title>
 type: synthesis
 status: active
 classification: public
+aliases: []
 tags: []
 sources:
   - "[[Source - <A>]]"
@@ -13,7 +14,13 @@ based_on:
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
 confidence: low | medium | high
+knowledge_status: current | disputed | superseded | uncertain
+review_needed: false
 ---
+
+A synthesis is the page most likely to be cited by a decision, so its `knowledge_status` is the
+field an impact report reads first. `superseded` here does not mean "delete" — it means a later
+synthesis answers the same question better, and the link between them must be recorded.
 
 # <Synthesis Title>
 
