@@ -8,16 +8,24 @@ LLM's decision.
 ## Part 1 — automated
 
 ```bash
-bash scripts/test-schema.sh        # 23 checks: schema conformance, duplicates, Phase 2 lint
-bash scripts/test-wiki-lint.sh     # 11 checks: one planted defect per Phase 1 lint check
-bash scripts/test-portability.sh   # 37 checks: raw/ enforcement, policy sync, command pointers
-bash scripts/test-baseline-metrics.sh
-bash scripts/verify-vault.sh       # the live vault, not a fixture
+bash scripts/test-schema.sh          # 23 checks: schema conformance, duplicates, Phase 2 lint
+bash scripts/test-wiki-lint.sh       # 11 checks: one planted defect per Phase 1 lint check
+bash scripts/test-portability.sh     # 42 checks: raw/ + okf/ enforcement, policy sync, pointers
+bash scripts/test-lint-governance.sh # 20 checks: Phase 4 OKF + cross-layer governance lint
+bash scripts/test-baseline-metrics.sh # 8 checks
+bash scripts/verify-vault.sh         # the live vault, not a fixture
 ```
 
-All five must pass. Each of the first four builds a throwaway fixture vault, plants defects, and
-asserts the defect is found — so a check that has silently stopped working fails the suite instead
-of reporting a clean vault.
+**104 automated checks.** All six commands must pass. Each of the first five builds a throwaway
+fixture vault, plants defects, and asserts the defect is found — so a check that has silently
+stopped working fails the suite instead of reporting a clean vault.
+
+`test-lint-governance.sh` was added in Phase 4 and carries two kinds of assertion the others do
+not: a **clean-vault** half (a correct counterpart for every planted defect, so the suite fails if
+a check fires on well-formed content) and a **documentation-coverage** check (every finding type
+the script can emit must appear in `docs/phase-4/lint-layers.md` and `prompts/wiki-lint.md`). The
+second exists because a cross-agent round found a finding type with no documented fix policy, and
+an undocumented finding type has no policy at all.
 
 | Plan case | Covered by | Assertion |
 |---|---|---|

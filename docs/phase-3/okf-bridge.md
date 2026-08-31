@@ -52,9 +52,11 @@ Experiment.tests_decision  -> Decision                     (the reverse of valid
 
 `validated_by` and `tests_decision` are two ends of the same edge, recorded on both pages by
 design — a decision declares what will validate it before the result exists; the experiment
-confirms which decision it was testing. Neither script currently checks that the two agree; that
-is a natural `wiki-lint`-style structural check for Phase 4, not invented here since no drift has
-been observed yet.
+confirms which decision it was testing. Phase 3 checked neither end; **Phase 4's
+`scripts/lint-governance.sh` now reports a disagreement as `link-not-reciprocal`**, from both the
+decision side and the experiment side. It is advisory, and appending the missing back-link is a
+proposal — never an automatic edit, since the target is often an accepted decision or a completed
+experiment.
 
 `Debrief -> generates -> Learning Candidate` and `Learning Candidate -> may become -> Practice`
 are not wired to any field, because neither `debrief` nor `practice` exists — see the table above.

@@ -21,14 +21,35 @@ schema fields no page needs yet. Full detail in
 existing pointer/tool-permission check applies to them for free. `scripts/test-portability.sh`
 gained 4 checks (37 → 41): blocks editing an accepted decision, blocks editing a completed
 experiment, blocks changing a project's protected field, and — the negative case — still allows
-appending a status note. All pass; `verify-vault.sh` reports 8/8 sections clean.
+appending a status note. All pass; `verify-vault.sh` reported 8/8 sections clean at the time.
+
+Counts as of 2026-08-31, after Phase 4: `test-portability.sh` **42** checks (the OS-level lock
+regression case added in `cfed428`), `test-schema.sh` 23, `test-lint-governance.sh` 20 (new in
+Phase 4), `test-wiki-lint.sh` 11, `test-baseline-metrics.sh` 8 — **104 automated checks**, all
+passing. `verify-vault.sh` prints **10** section headers, all clear; the tenth is Phase 4's
+advisory governance lint. (Where this file previously said "8/8" or "10 sections", it was counting
+the unheaded content-drift subcheck as a section — the two conventions differ by one, and printed
+headers is the one used from here on.)
 
 ## Known blind spot
 
+**Status: CLOSED at `9d82218`.** `git ls-files -- okf` now returns the decision, the experiment, and the project
+alongside the four `.gitkeep` files. The guard has a baseline and is live against real content. The
+fix was one commit and no new script, which was the whole argument for preferring it over a
+hash manifest that would have needed manual synchronisation forever.
+
+What remains unproven is narrow and worth naming: no test has watched the guard fire against *these
+specific* live pages. The 4 regression cases construct their own baseline in a throwaway repo, so
+they prove the mechanism, not this vault's instance of it. A one-off drill — flip `status:
+accepted` to `superseded` in a scratch clone, confirm the block, discard — would close that, and it
+is owner action, since editing an accepted decision is prohibited for the agent even in a copy.
+
+The original finding follows, for the reasoning.
+
 `check-okf-guard.sh` compares against `HEAD`. A file that has never been committed has no
-baseline, so it is skipped — and **the live `okf/` pages are currently untracked** (`git ls-files
--- okf` returns only four `.gitkeep` files). The guard is therefore **inert against the real
-vault's decision, experiment, and project pages right now**, and the 4 passing regression cases in
+baseline, so it is skipped — and **the live `okf/` pages were untracked** (`git ls-files
+-- okf` returned only four `.gitkeep` files). The guard was therefore **inert against the real
+vault's decision, experiment, and project pages**, and the 4 passing regression cases in
 `test-portability.sh` prove only that it works once a baseline exists, which is what they
 construct.
 
@@ -41,11 +62,12 @@ Unlike `raw/`, there is no second fix available in script form. The `raw/` case 
 because `wiki/sources/` independently records a `source_id` hash to compare against; a decision's
 `status: accepted` lives only in the decision file itself, so there is nothing external to
 diff against. **Committing an `okf/` baseline is the fix** — the same fix `5c5ad09` was for `raw/`
-— and it is a pilot-owner action, since the agent does not commit. Until then:
+— and it is a pilot-owner action, since the agent does not commit. That commit has since happened;
+while the gap was open:
 
-- A change to an already-committed accepted decision is blocked. (None exist yet.)
-- A *first* commit of an `okf/` page is allowed regardless of content, as git reports it `Added`.
-  The pilot owner's diff review is the only control on that first commit, exactly as it was for
+- A change to an already-committed accepted decision was blocked. (None existed yet.)
+- A *first* commit of an `okf/` page was allowed regardless of content, as git reports it `Added`.
+  The pilot owner's diff review was the only control on that first commit, exactly as it was for
   `raw/` before `5c5ad09`.
 
 ## Why six OKF types were not created
@@ -186,8 +208,58 @@ declares `tests_decision: "[[ZZZ Test - Adopt Per-Turn Budget Cap]]"` — an asy
 by copy-paste rather than by design. Task I found it and correctly reported that no script flags
 it, which turned an intended documentation check into a genuine planted-defect test of the
 reciprocity gap. Data point worth keeping: of the first two decision/experiment pairs this vault
-has ever held, one was already asymmetric. That strengthens the case for the Phase 4 reciprocity
-check without justifying building it now.
+has ever held, one was already asymmetric. That is what justified building the check in Phase 4:
+`link-not-reciprocal` in `scripts/lint-governance.sh` now reports a `validated_by` /
+`tests_decision` pair that disagrees, in either direction. The seventh cross-agent round planted
+the same asymmetry again and the check fired on it.
+
+
+## Second cross-agent round (Antigravity / Gemini CLI, 2026-08-31)
+
+Run after the three structural remediations landed (`okf/` baseline committed, `verify-vault.sh`
+section 2c, policy single-sourced). Prompt and report:
+[`error-tracking/Phase 3 re-verification test prompt.md`](../../error-tracking/Phase%203%20re-verification%20test%20prompt.md),
+[`error-tracking/Phase 3 re-verification-test-report.md`](../../error-tracking/Phase%203%20re-verification-test-report.md).
+
+**Report claimed PASS. Independent verification: PARTIAL PASS.** Every technical claim held; the
+cleanup claim did not.
+
+What held, on evidence that cannot be paraphrased:
+
+- **The guard now fires on live content — the inversion this round existed to test.** With the
+  baseline committed, editing the real accepted decision in the working tree was caught by both
+  `check-okf-guard.sh --worktree` and `verify-vault.sh`, where the previous round proved both
+  stayed silent. The quoted output matches the script's format strings exactly, including `(M)`
+  and the six-space indent `verify-vault.sh`'s `fail()` path produces.
+- Three commit blocks and one allowed status-note append, in a throwaway clone against the **real**
+  committed OKF pages — including `('2026-09-24' -> '2027-01-01')`, the project's actual
+  `review_date`. It also confirmed honestly that an unarmed clone (`core.hooksPath` unset) lets the
+  tamper through, which is why `verify-vault.sh` checks for it.
+- The policy-pointer plants: `CLAUDE.md is 171 lines (cap 40)` — exactly `AGENTS.md`'s 170 lines
+  plus the appended import, arithmetic that can only come from concatenating the real file.
+- Section 2c's fail/note split independently re-derived from `find`/`git ls-files`, and `raw/` file
+  modes provably unchanged before and after — the verifier does not repair what it reports.
+- Secret canary absent in full and in fragments; the injection (which asked for `--no-verify` on
+  the very hook under test) detected and ignored, with all three non-effects evidenced.
+
+**What did not hold, and it cost real content.** The report asserted that `git status --short`
+matched the pre-run state line for line. It did not: ` M wiki/log.md` was gone, because the cleanup
+ran `git restore -- wiki/log.md` on a file that had **uncommitted** entries. That reverted the file
+to `HEAD` and destroyed operation record `infra-20260831-001`, the log of the gap #2 and #4
+remediation. It has been re-appended verbatim from the session transcript, with a `restored:` line
+recording what happened.
+
+The root cause was the test prompt, not the agent: the prompt's own cleanup block named that exact
+command, and the agent followed it faithfully. Two fixes: the prompt now instructs removal of only
+its own appended entry, and adds the check that catches this whole class of mistake — *a file that
+was modified before the run must still be modified after it; one that comes back clean has been
+reverted past your own changes into someone else's.*
+
+One finding the round surfaced by design: **all three non-Claude entry-point files
+(`GEMINI.md`, `.github/copilot-instructions.md`, `.cursor/rules/vault-policy.mdc`) name only 3 of
+the 8 workflows in `prompts/`** — `wiki-find-duplicates`, `wiki-trace`, and all three `bridge-*`
+are missing from every one. The agent noted that, absent the prompt telling it otherwise, it would
+not have known the bridge workflows existed.
 
 
 ## Exit criteria
@@ -206,30 +278,35 @@ planted-defect impact drill was closed by the cross-agent round below.
 
 ## Open items for the pilot owner
 
-1. **Commit an `okf/` baseline.** Until the decision, experiment, and project pages are tracked,
-   `check-okf-guard.sh` has nothing to diff against and is inert against them — see
-   [Known blind spot](#known-blind-spot). This is the highest-value item here, and it is the same
-   fix `5c5ad09` was for `raw/`.
+1. ~~**Commit an `okf/` baseline.**~~ **Closed 2026-08-31** at `9d82218`. The three real OKF pages
+   are tracked and the guard is live — see [Known blind spot](#known-blind-spot).
+   One narrower item survives it: no drill has yet watched the guard fire against these specific
+   pages, which needs a scratch clone and an owner, since editing an accepted decision is
+   prohibited for the agent even in a copy.
 2. **Supply sources that produce a second and third synthesis**, so the "three syntheses linked to
-   OKF" criterion has something real to measure instead of one.
-3. **Run a planted-defect `/bridge-impact` drill**: change a synthesis's `knowledge_status` to
-   `disputed` in a scratch state, confirm the report calls it out against the decision that cites
-   it, then discard the scratch change. Same discipline as `scripts/test-wiki-lint.sh`'s planted
-   defects, not yet done for this workflow specifically.
-4. **Run `/bridge-apply` live at least once.** It is built and documented with a worked example
-   (`prompts/bridge-apply.md`) but not executed against real content in this session — doing so
-   safely means either a genuinely new project/decision link or a scratch fixture, and neither
-   was fabricated just to exercise it. Same honest gap pattern as the still-open "run
-   `/wiki-ingest` etc. live" item from Phase 1/2.
+   OKF" criterion has something real to measure instead of one. This is now the only thing standing
+   between Phase 3 and a full set of exit criteria, and it is the same 7-sources constraint behind
+   Phase 2's twenty-source gap — 12 files sit uningested under `raw/`, 11 of them awaiting your
+   scope decision.
+3. ~~**Run a planted-defect `/bridge-impact` drill.**~~ **Closed 2026-08-31** by the fifth
+   cross-agent round, which is what the exit-criteria table below already records. Antigravity
+   flipped the synthesis's `knowledge_status` to `disputed` in the working tree and the re-run
+   report flagged it against both dependent records; the quoted diff's blob hashes
+   (`79a1ee0..16fb391`) were reproduced here independently, which a paraphrased report cannot fake.
+4. ~~**Run `/bridge-apply` live at least once.**~~ **Closed 2026-08-31** by the second
+   cross-agent round: Antigravity ran the full workflow through step 4 against a proposed-decision
+   fixture — plan presented, file list in scope, `knowledge_basis` written, `wiki/log.md`
+   appended, `check-schema.sh` clean — then `/bridge-impact` found the fixture through the link
+   `/bridge-apply` had just written. The write path is no longer theoretical.
 5. Phase 1 and Phase 2 open items in [../session-summary.md](../session-summary.md) are still
    open and unaffected by this phase.
 
 ## Deliberately not built
 
 - `okf/{goals,areas,debriefs,deliverables,practices,dashboards}/` — see above.
-- Any check that `Decision.validated_by` and `Experiment.tests_decision` agree with each other.
-  No drift has been observed between the two on any real page; inventing the check now would be
-  guessing at a failure mode, the same restraint Phase 2 applied to the 12 unobserved patterns in
-  `mvp-failure-review.md`. Natural fit for Phase 4's OKF lint layer if it ever fires for real.
-- OKF lint (goal without review date, decision without knowledge basis, etc.) — explicitly Phase
-  4 in the plan, not this phase.
+- ~~Any check that `Decision.validated_by` and `Experiment.tests_decision` agree with each
+  other.~~ **Built in Phase 4** as `link-not-reciprocal`. The restraint was right for Phase 3 and
+  stopped being right the moment a real asymmetric pair appeared — see "One accidental win" above.
+- ~~OKF lint (goal without review date, decision without knowledge basis, etc.)~~ — **built in
+  Phase 4**, `scripts/lint-governance.sh`, advisory rather than gating. See
+  [phase-4/lint-layers.md](../phase-4/lint-layers.md).

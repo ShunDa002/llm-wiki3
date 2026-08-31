@@ -25,6 +25,7 @@ scripts/guard-raw-universal.sh         the write, pre-commit     any agent with 
 .claude/settings.json permissions.deny the write, pre-commit     Claude Code only
 .claude/hooks/protect-raw.sh           the write, pre-commit     Claude Code only
 AGENTS.md and friends                  nothing — it informs      every agent that reads it
+.github/workflows/verify-vault.yml     a violation going unseen  ANY agent — even one with no shell
 ```
 
 The top two rows survive an agent switch. `chmod 444` was added after real testing against Antigravity
@@ -53,8 +54,11 @@ bash scripts/verify-vault.sh
 `core.hooksPath` is local config, not a tracked file, so **every clone must do this** — including
 yours after a re-clone. File permission bits aren't Git-tracked either, so `raw/` arrives writable
 on a fresh clone until `lock-raw.sh` runs. `verify-vault.sh` fails loudly when the hook isn't
-armed, but it does not check file permissions — a missed `lock-raw.sh` is silent until an actual
-write is attempted. Re-run `lock-raw.sh` after adding any new file under `raw/`, too.
+armed, and since `cfed428` it also checks file permissions: a writable *tracked* evidence file
+fails the run, a writable *untracked* one is noted as legitimately pending. A missed `lock-raw.sh`
+is therefore loud, not silent. Re-run `lock-raw.sh` after adding any new file under `raw/` — and
+run it *after* committing new evidence, not before, since committing a writable file turns a note
+into a failure.
 
 The hook is committed with mode `100755` (forced via `git update-index --chmod=+x`) because this
 filesystem reports `core.fileMode=false`. Without that, a fresh clone would materialise the hook
@@ -87,11 +91,18 @@ Verified by running it here:
   including tool names used by Claude, Codex, and Gemini.
 - `check-policy-sync.sh` detects a rule removed from the canonical `AGENTS.md`, a missing
   `@AGENTS.md` import in `CLAUDE.md`, and `CLAUDE.md` re-grown into a second policy copy.
-- **The `@AGENTS.md` import itself resolves.** Confirmed in a fresh session: `/memory` lists
-  `AGENTS.md` as loaded, and the agent answered a question whose content exists only in
-  `AGENTS.md` (the no-hook-system guidance) with no tool call, attributing it to that file. The
-  duplication was not removed until this was proven, precisely because it could not be tested
-  from inside a running session.
+- **The `@AGENTS.md` import itself resolves — verified twice, on both sides of the collapse.**
+  Before any duplicated text was removed, a fresh session's `/memory` listed `AGENTS.md` as
+  loaded and the agent answered a question whose content exists only in `AGENTS.md` (the
+  no-hook-system guidance) with no tool call, attributing it to that file. The same check was
+  repeated after `CLAUDE.md` was reduced to 16 lines, and passed again — which is the one that
+  actually matters, since that is the state the vault now ships in. Neither check could be run
+  from inside a running session, which is why the collapse was gated on a human running them.
+- **Policy still reaches a non-Claude agent after the collapse.** Antigravity/Gemini CLI reported
+  honestly that it does **not** resolve `@AGENTS.md` — it is a Claude Code mechanism — and that it
+  received the policy through its own workspace-rule loading of `AGENTS.md` plus `GEMINI.md`'s
+  pointer. It then quoted three `AGENTS.md`-only rules correctly. The single-sourcing did not
+  strand agents that cannot follow the import.
 - Committed hook mode is `100755` and survives a clone.
 - **Against a real non-Claude agent, not just the test suite:** three rounds of adversarial
   testing against Antigravity (Gemini CLI), prompts and reports kept in `error-tracking/`.
@@ -108,6 +119,27 @@ Verified by running it here:
   PASS, independently re-verified: cleanup left no trace, the duplicate-detection output matched
   the script's actual logic down to its column padding, and the claim-trace quotes matched the raw
   source verbatim.
+- **The Phase 3 OKF bridge, two further rounds against the same agent** (2026-08-31), bringing the
+  total to six. Round 5 covered all nine Phase 3 elements and was required to *confirm* the
+  then-open `okf/` guard blind spot rather than paper over it — overstating it was an explicit FAIL
+  condition. Round 6 re-verified after the fixes and closed the planted-defect `/bridge-impact`
+  drill and the first live `/bridge-apply` write. Both PASS, both independently re-verified; the
+  strongest single piece of evidence was reproducing a quoted `git diff`'s blob hashes
+  (`79a1ee0..16fb391`) here, which a paraphrased report cannot fake. Detail in
+  [phase-3/status.md](phase-3/status.md#exit-criteria).
+
+- **The Phase 4 governance layer, a seventh round against the same agent** (2026-08-31): all four
+  lint layers, the advisory/gating separation, the 15 governance checks against six planted
+  fixtures, the two environment-override date paths, and plants against
+  `check-command-pointers.sh` and `check-policy-sync.sh`. PASS, independently re-verified — four
+  raw-file sha256 hashes and three finding counts were reproduced here. It found a real defect in
+  Phase 4's own documentation (a finding type with no fix-policy row), which is now guarded by an
+  automated check rather than a habit. Detail in
+  [phase-4/status.md](phase-4/status.md#cross-agent-verification-antigravity--gemini-cli-2026-08-31).
+
+  Round count, since it is easy to get wrong: **seven rounds, six reports.** Round 1 produced only
+  a problems summary, because its canaries were never placed in the vault and there was nothing to
+  report on. Documents that say "five" or "six rounds" were written before rounds 6 and 7.
 
 Not verified, because it cannot be tested from inside this vault:
 
@@ -123,7 +155,7 @@ agent "read AGENTS.md and follow it" at the start of the session.
 
 ## Workflows without slash commands
 
-`prompts/wiki-{ingest,query,lint}.md` is the **canonical, single-sourced** definition of each
+`prompts/*.md` — eight files now — is the **canonical, single-sourced** definition of each
 workflow. `.claude/commands/*.md` are thin pointers into it — frontmatter (Claude's
 `description`/`allowed-tools`) plus one line: *"Follow `prompts/<name>.md`."* There is exactly one
 place workflow content lives; `/wiki-ingest` under Claude Code and *"follow
@@ -137,9 +169,17 @@ file.
 | Lint | `prompts/wiki-lint.md` | `/wiki-lint` (pointer) |
 | Find duplicates | `prompts/wiki-find-duplicates.md` | `/wiki-find-duplicates` (pointer) |
 | Trace | `prompts/wiki-trace.md` | `/wiki-trace` (pointer) |
+| Bridge apply | `prompts/bridge-apply.md` | `/bridge-apply` (pointer) |
+| Bridge impact | `prompts/bridge-impact.md` | `/bridge-impact` (pointer) |
+| Bridge promote | `prompts/bridge-promote.md` | `/bridge-promote` (pointer) |
 
-The last two were added in Phase 2 and built as pointers from the start, so the collapse below was
-a one-time correction, not an ongoing discipline.
+Find-duplicates and trace were added in Phase 2, the three bridge workflows in Phase 3, and all
+five were built as pointers from the start — so the collapse below was a one-time correction, not
+an ongoing discipline.
+
+Phase 4 added no workflow. It extended `prompts/wiki-lint.md` with the governance layer and one
+more script (`scripts/lint-governance.sh`), which is why the `allowed-tools` seam below got its
+own regression plant in the seventh cross-agent round.
 
 Under another agent: *"Follow prompts/wiki-ingest.md for raw/articles/01-example.md."*
 
@@ -218,11 +258,23 @@ legitimate work teaches the operator to route around it, which is worse than no 
 4. **The pre-commit hook is bypassable** with `git commit --no-verify`, on purpose: the pilot
    owner legitimately needs to correct a mis-captured source. It is a control against agent
    error, not a control against a determined human.
-5. **It protects `raw/`, not `okf/`.** Accepted-decision immutability is still policy-only. A
-   hook could enforce it, but the plan puts semantic OKF protection in Phase 3 and inventing it
-   now would be guessing at rules that phase hasn't defined.
-6. **Nothing here protects against an agent with no hooks and no shell.** In that mode the vault
-   is policy-only, which `AGENTS.md` says plainly rather than implying safety that isn't there.
+5. **`okf/` is now enforced too, but only for immutability — not for meaning.** This limitation
+   used to read "it protects `raw/`, not `okf/`"; Phase 3 closed that with
+   `scripts/check-okf-guard.sh`, wired into the same pre-commit hook, so an accepted decision, a
+   completed experiment, and a project's `status`/`owner`/dates are blocked under any agent. What
+   is still *not* enforcement is everything Phase 4 added: `scripts/lint-governance.sh` reports
+   that an accepted decision rests on knowledge which has since changed, and that report is
+   advisory by design (`verify-vault.sh` section 9 notes it and still exits 0). A governance
+   finding is a question for a human, so no layer blocks on it — see
+   [phase-4/lint-layers.md](phase-4/lint-layers.md#42-fix-policy-by-finding-type).
+6. **An agent with no hooks and no shell is observed, not stopped.** Every local layer above needs
+   a hook system or a shell, so under such an agent none of them run. `.github/workflows/verify-vault.yml`
+   closes the observation half: it arms `core.hooksPath` and the lock on a fresh checkout, then runs
+   `verify-vault.sh` on every push and pull request, regardless of what the local agent can do. It
+   cannot reject a push — GitHub Actions runs after the fact. Making it a gate is an owner action on
+   the hosting side: require the check in branch protection for `main`, or use a `pre-receive` hook
+   on a remote that supports one. Until then the vault is still policy-only at write time, which
+   `AGENTS.md` says plainly rather than implying safety that isn't there.
 
 ## Files added or restructured
 
@@ -237,13 +289,18 @@ prompts/wiki-{ingest,query,lint,find-duplicates,trace}.md   canonical, single-so
                                    find-duplicates/trace born as pointers in Phase 2)
 scripts/guard-raw-universal.sh     reusable pre-tool guard core
 scripts/verify-vault.sh            agent-independent verification + content-drift check
+                                   (10 printed sections since Phase 4 added the governance one)
+scripts/lint-governance.sh         OKF + cross-layer governance lint (Phase 4; advisory, read-only)
+scripts/test-lint-governance.sh    20 checks for the above, incl. a documentation-coverage check
 scripts/lock-raw.sh                OS-level chmod 444 lock for tracked raw/ files
 scripts/lib-vault.sh               added recorded_source_id() helper, shared by the two above
 scripts/check-policy-sync.sh       pointer-integrity + canonical-completeness check (CLAUDE.md -> AGENTS.md)
 scripts/check-command-pointers.sh  command-pointer drift detector (commands vs prompts)
+.github/workflows/verify-vault.yml server-side verify-vault.sh run (reports; does not gate)
 scripts/test-portability.sh        self-check for all of the above, 42 checks
 docs/agent-portability.md          this file
-error-tracking/                    Antigravity test prompts and reports, 3 rounds
+error-tracking/                    Antigravity test prompts and reports, 7 rounds (round 1
+                                   produced no report), plus the structural-gap triage
 ```
 
 Everything above is new **except**:

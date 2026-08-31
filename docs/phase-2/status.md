@@ -79,7 +79,9 @@ re-checked against real repo state rather than taken on the report's word.
 - The three sentences quoted in the `/wiki-trace` task were checked against
   `raw/articles/01-markdown-first-retrieval.md` — verbatim matches, not paraphrase.
 - `SECRET_CANARY` never appeared anywhere in the report, full or partial.
-- `verify-vault.sh` re-run after the fact: 7/7 sections clean.
+- `verify-vault.sh` re-run after the fact: 7/7 sections clean at the time. The script has since
+  grown to **10 printed section headers** — the OKF semantic guard in Phase 3, the OS-level lock
+  check in `cfed428`, and Phase 4's advisory governance lint — and still reports all clear.
 
 **One gap in the report itself, not a violation:** Task D (contradiction handling) never ran
 `check-schema.sh` against the two temporary fixture pages before stashing them, so full schema
@@ -96,8 +98,10 @@ related but distinct exercise and is still not run.
 
 ## Open items for the pilot owner
 
-1. **Commit or reject** this work plus the still-uncommitted Phase 1 ingest content. The agent does
-   not commit.
+1. ~~**Commit or reject** this work plus the still-uncommitted Phase 1 ingest content.~~
+   **Closed 2026-08-31.** Everything is committed: Phase 2 at `7791091`, the `wiki/` page migration
+   at `f30c6ea`, and Phases 0 through 3 plus all five cross-agent rounds behind it. The
+   long-standing "everything awaits owner review" state is over.
 2. **Supply 13 more sources** for the twenty-source exit criterion, then re-run
    `bash scripts/find-duplicates.sh` and `bash scripts/check-schema.sh` — a duplicate rate measured
    over 6 pages is not yet evidence of anything.
@@ -107,7 +111,11 @@ related but distinct exercise and is still not run.
    Antigravity round above exercised equivalent scenarios with fresh fixtures — it is evidence the
    mechanism works, not a substitute for these 8 specific cases against the vault's real sources.
 4. **Re-run `bash scripts/lock-raw.sh`** after any commit that adds files under `raw/`; new files
-   land writable.
+   land writable. **Sequencing matters, learned the hard way:** run it *after* the commit, not
+   before. Locking first and committing second promotes the new files from "untracked and writable,
+   merely noted" to "tracked and writable, hard failure" — which is exactly what happened when the
+   11 later notes were committed. Since `cfed428`, `verify-vault.sh` reports this rather than
+   staying silent about it. Currently clean: every tracked evidence file is read-only.
 5. Phase 1 open items 2–6 from [../session-summary.md](../session-summary.md) are still open,
    including the live slash-command invocation check.
 
@@ -118,5 +126,7 @@ related but distinct exercise and is still not run.
   [page-taxonomy.md](page-taxonomy.md#types-not-yet-created)
 - `/wiki-synthesize` and `/wiki-review-source` from plan §4 — no Phase 2 exit criterion depends on
   them, and ingest plus query already cover the ground
-- Any auto-fix. Every Phase 2 check reports; none repairs. Auto-fix eligibility is Phase 4
+- Any auto-fix. Every Phase 2 check reports; none repairs. Phase 4 has since **documented**
+  eligibility per finding type without enabling anything —
+  [phase-4/lint-layers.md §4.2](../phase-4/lint-layers.md#42-fix-policy-by-finding-type)
 - OKF-side schema changes (`goals/`, `areas/`, accepted-decision enforcement) — Phase 3

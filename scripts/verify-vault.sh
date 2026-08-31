@@ -214,6 +214,26 @@ else
   note "scripts/check-okf-guard.sh not found — skipping"
 fi
 
+# --- 9. governance lint (Phase 4, advisory) -------------------------------
+# Advisory for the same reason section 7 is: every finding here is a review prompt about meaning
+# ("this accepted decision rests on knowledge that changed since"), not a broken invariant. A
+# review prompt that blocks write work gets the whole verifier switched off.
+echo
+echo "-- governance lint (Phase 4, advisory) --"
+if [ -f scripts/lint-governance.sh ]; then
+  if gov_out=$(bash scripts/lint-governance.sh 2>&1); then
+    pass "no OKF or cross-layer governance findings"
+  else
+    printf 'note  %s\n' "governance findings — review, never auto-fix:"
+    # Finding types all contain a hyphen; section headers start with '--' and the closing prose
+    # does not, so one pattern separates findings from both.
+    printf '%s\n' "$gov_out" | grep -E '^[a-z][a-z]*-[a-z-]+ ' | sed 's/^/      /'
+    note "fix policy per finding type: docs/phase-4/lint-layers.md"
+  fi
+else
+  note "scripts/lint-governance.sh not found — skipping"
+fi
+
 echo
 if [ "$problems" -eq 0 ]; then
   echo "All clear."

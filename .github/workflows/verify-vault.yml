@@ -1,0 +1,33 @@
+# Server-side enforcement. Every other layer in this vault needs a local hook system or a shell,
+# so an agent that has neither reduces the vault to policy text (gap #6 in
+# error-tracking/Structural gaps and remediation triage.md). This job runs regardless of what the
+# local agent can do.
+#
+# It reports, it does not block: a GitHub Actions run cannot reject a push. To make it a gate,
+# require this check in the branch protection rules for main, or move it to a pre-receive hook on
+# a self-hosted remote.
+name: verify-vault
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # core.hooksPath is local config and file modes are not Git-tracked, so a fresh clone
+      # arrives with the backstop unarmed and the evidence directory writable — the same one-time
+      # setup every human clone needs (docs/agent-portability.md).
+      - name: Arm the portable enforcement layer
+        run: |
+          git config core.hooksPath .githooks
+          bash scripts/lock-raw.sh
+
+      - name: Verify vault
+        env:
+          VAULT_AGENT: github-actions
+        run: bash scripts/verify-vault.sh

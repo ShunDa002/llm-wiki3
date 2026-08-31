@@ -1,4 +1,4 @@
-# Session summary: Phase 0 to Phase 3, agent portability, and Antigravity boundary testing
+# Session summary: Phase 0 to Phase 4, agent portability, and Antigravity boundary testing
 
 Date: 2026-08-24 to 2026-08-31
 Vault: `/c/Data/llm-wiki3`
@@ -538,6 +538,126 @@ Full table: [phase-3/status.md](phase-3/status.md#exit-criteria).
 
 ## 8. Where things stand now
 
+### Roadmap position, re-verified against live repo state 2026-08-31
+
+| Phase | Plan target | Exit criteria | What is actually blocking |
+|---|---|---|---|
+| 0 | Controls and baseline | **5 of 5 met** | nothing — closed 2026-08-31 |
+| 1 | MVP closed loop | **9 of 9 met** | nothing; one criterion carries a recorded `raw/` incident rather than a clean sheet |
+| 2 | Schema stabilization | 4 met, 1 met at current scale, 2 open | 20 sources (7 ingested); reviewer confirmation |
+| 3 | OKF bridge | **5 of 6 met** | 3 syntheses linked to OKF (1 exists) |
+| 4 | Lint and governance | **4 of 6 met, 1 half met, 1 needs the owner** | human review time unrecorded; reviewer confirmation of lint precision (a second agent has now reached the same precision verdict) |
+| 5–7 | Retrieval, automation, high automation | not started | correct, gated on earlier exits |
+
+Content: 4 concepts, 7 sources, 1 synthesis, 1 question, 3 OKF records, 17 logged operations, 7
+index links. Machinery: 17 scripts, 8 single-sourced workflows, 6 entry-point files, **104 automated
+checks** all passing (portability 42, schema 23, governance 20, lint 11, metrics 8) — the
+governance suite gained its 20th check in round 7.
+`verify-vault.sh`: all clear, now 11 sections. Evidence: 19 tracked files under `raw/`, all
+read-only, **12 of them uningested**.
+
+**One constraint wearing three hats.** Phase 2's twenty-source criterion, Phase 3's three-synthesis
+criterion, and Phase 2's "a duplicate rate measured over 6 pages is not evidence" all resolve the
+same way: more ingested sources. The supply problem is over — 12 files sit in `raw/` — so what
+remains is the scope decision in open item 2, not a shortage of material.
+
+**Phase 4 was startable without waiting for that, and is now built** — see §9 below. Its exit
+criteria turn on lint precision, auto-fix policy, and traceability rather than source count, which
+is why it could proceed while the source-count criteria stay open.
+
+---
+
+## 9. Phase 4 — lint, governance, and maintenance (2026-08-31)
+
+Objective: make deterioration detectable and maintenance repeatable. Full detail:
+[phase-4/status.md](phase-4/status.md), [phase-4/lint-layers.md](phase-4/lint-layers.md),
+[phase-4/maintenance-log.md](phase-4/maintenance-log.md).
+
+The starting observation was that the vault already had three of the plan's four lint layers and
+did not know it — `wiki-lint.sh`, `check-schema.sh`, and `find-duplicates.sh` between them cover
+structural lint and most of knowledge lint, and `check-okf-guard.sh` protects OKF semantics without
+ever reporting on them. What was genuinely missing was the **OKF and cross-layer reporting layers**,
+a fix policy per finding type, and any record of what maintenance costs.
+
+### What was built
+
+- `scripts/lint-governance.sh` — 15 checks across the OKF layer, the cross-layer layer, and the two
+  knowledge-layer staleness checks nothing else was doing. **Advisory** in `verify-vault.sh`
+  (section 9), not a gate, and that split is the design decision worth remembering: an OKF or
+  cross-layer finding is a review prompt about *meaning* ("this accepted decision rests on knowledge
+  that changed after it was accepted"), and a review prompt that blocks write work teaches its
+  operator to switch the whole verifier off. Structural lint stays a hard failure; governance lint
+  asks a question.
+- `docs/phase-4/lint-layers.md` — every finding in the plan's four lists marked implemented,
+  already-covered, or **deliberately not implemented with the reason**. The plan's `debriefs/`,
+  `practices/`, and action-item findings fall in the third bucket: a check against a folder Phase 3
+  deferred can never fire, and writing it now means guessing that folder's schema.
+- The fix policy (§4.2) as an *eligibility register*, not a switch. Nothing is auto-fixed. Two
+  genuine candidates exist (`wrapped-wikilink` repair, safe-metadata fill) and both are gated on an
+  observation period that has now had exactly one run.
+- Review cadences as runnable read-only commands, and `docs/phase-4/maintenance-log.md` to record
+  each run — because "maintenance workload is measured" cannot be reconstructed later.
+
+Two checks were added that the plan does not list. `link-not-reciprocal` closes the
+`validated_by`/`tests_decision` asymmetry Phase 3 documented in both directions and enforced in
+neither — the gap a cross-agent test fixture exposed by accident when one of the first two
+decision/experiment pairs this vault ever held turned out already asymmetric. `okf-review-overdue`
+catches the cadence failing in public.
+
+### One live false positive, found by running it against the real vault
+
+`okf-cites-evidence-only` fired on `okf/experiments/Native Retrieval Benchmark.md`, which links the
+source page recording *the experiment itself* — provenance, not a bypass of the knowledge layer. The
+missing condition was in the plan's own sentence: "a project cites raw sources directly **even
+though a synthesis exists**". The check now requires both halves, and the negative case is a test
+assertion. Third time in this vault a check has needed tuning rather than shipping, after Phase 2's
+similar-title ratio and its "None recorded." exemption — and the third time the fixtures alone would
+not have caught it.
+
+### Verified, not asserted
+
+`scripts/test-lint-governance.sh` — 20 checks: one planted defect per governance check (15), the
+false-positive negative case, the exit code, a **clean vault producing no findings at all**, and a
+hash comparison proving the script writes nothing (the plan's "semantic lint does not silently
+modify content", as a test rather than a claim). All five suites pass — 103 checks. The traceability
+exit criterion was walked mechanically rather than asserted: the one accepted decision resolves
+through its synthesis and four source pages to four read-only raw files, with both sides of the
+underlying contradiction represented in the chain.
+
+Live run: **3 findings, 3 true positives, 0 false positives.** Two are
+`project-on-disputed-knowledge` on the pilot project, which is the correct and intended state — the
+synthesis resolves the contradiction *below ~100 pages* while both concepts stay disputed in
+general — and will recur on every run until the owner decides how to record acceptance. One is
+`knowledge-changed-since-decision`, reviewed and closed as a metadata migration, with no field
+edited to silence it.
+
+### Cross-agent verification (Antigravity / Gemini CLI, 2026-08-31)
+
+Seventh round, same discipline. **Report claimed PASS; verification confirmed it** — the four raw
+sha256 hashes in its traceability walk reproduce byte-for-byte here, and its finding counts (18 with
+fixtures, 15 at `VAULT_TODAY=2026-01-01`, 20 at `VAULT_STALE_DAYS=0`) match an independent rebuild of
+the same six fixtures in a scratch copy. All 15 governance checks fired on the files the report named.
+
+**It also found a real defect in this phase's own docs**, which is the point of running these rounds:
+`decision-basis-missing` was missing from `lint-layers.md`. Auditing the thread it pulled showed the
+gap was wider — §4.2 had **no fix-policy row for 7 of the 15 governance types**, while "auto-fix
+eligibility is documented by finding type" is an exit criterion. Fixed, and the drift class is now an
+automated check (`test-lint-governance.sh`, 19 → 20): every finding type the script can emit must
+appear in both `lint-layers.md` and `prompts/wiki-lint.md`. Proved by planting the exact defect in a
+scratch copy and watching the suite fail.
+
+One error in the report, corrected rather than adopted: its task O put the uningested `raw/` count at
+2, where the real number is **12** — a `raw/*/*.md` glob does not reach `raw/notes/Python/` and its
+siblings. Same class as the Phase 0 `xargs` split: a scan that looks exhaustive and is not.
+
+### Automation level stayed at 2
+
+The plan permits 3 for this phase. Not taken: level 3 means autonomous low-risk execution, and every
+auto-fix candidate is conditioned on an observation period with one data point. Documenting
+eligibility is the exit criterion; flipping the switch is not.
+
+---
+
 ```
 Committed:
   6dd65a3  Phase 0: controls, scope, and baseline
@@ -551,72 +671,134 @@ Committed:
   477473c  Collapse workflow duplication: commands become pointers to prompts/
   5c5ad09  Commit raw/ evidence baseline (the real Phase 1 sources, finally tracked)
   987d9c1  test: probe-add-only (Round 3 boundary-probe artifact, left in place per policy)
+  7791091  Phase 2: quality-control scripts, workflows, and docs
+  f30c6ea  Migrate wiki/ pages
+  9d82218  Add okf/ guard baseline          <- made check-okf-guard.sh live (gap #1)
+  4e76d8a  Phase 3: OKF bridge workflows and semantic guard
+  cfed428  Make a missed raw/ lock loud; single-source the policy text  (gaps #4, #2)
+  288d4dc  Add new raw/ evidence; five cross-agent test rounds
 
-Uncommitted (deliberately, awaiting pilot-owner review):
-  wiki/index.md, wiki/log.md            — updated with the 7-source ingest
-  wiki/sources/*, wiki/concepts/*,
-  wiki/syntheses/*                      — ingest output
-  okf/projects/, okf/decisions/,
-  okf/experiments/                      — first real OKF closed-loop content
-  .claude/settings.json                — git commit moved ask -> deny (§4)
-  .githooks/pre-commit, scripts/verify-vault.sh,
-  scripts/lib-vault.sh, scripts/test-portability.sh — content-drift check (§4)
-  scripts/lock-raw.sh                   — new file, OS-level raw/ lock (§4)
-  docs/session-summary.md, docs/agent-portability.md — this update
-  error-tracking/                       — 3 portability rounds (§4) + 1 Phase 2 quality-control round (§6)
-
-Uncommitted, Phase 2 (§5):
-  CLAUDE.md, AGENTS.md                  — phase 2, schema block, new rules and workflows
-  templates/concept.md, templates/synthesis.md — aliases, knowledge_status, review_needed, claim block
-  templates/question.md                 — new page type
-  wiki/questions/                       — new folder, first question page
-  wiki/concepts/*, wiki/syntheses/*     — migrated onto the new schema; claim block on one page
-  wiki/index.md, wiki/log.md            — open question repointed; operation schema-20260830-001
-  scripts/check-schema.sh, scripts/find-duplicates.sh, scripts/test-schema.sh — new
-  scripts/{lib-vault,wiki-lint,verify-vault,check-command-pointers}.sh — extended
-  prompts/wiki-{find-duplicates,trace}.md + .claude/commands/ pointers — new workflows
-  prompts/wiki-{ingest,lint}.md         — duplicate check, question type, knowledge_status, new findings
-  docs/phase-2/                         — failure review, taxonomy, test suite, status
-
-Uncommitted, Phase 3 (§7):
-  CLAUDE.md, AGENTS.md                  — phase 3, okf/ bridge workflows, protected-fields note
-  prompts/bridge-{apply,impact,promote}.md + .claude/commands/ pointers — new workflows
-  scripts/check-okf-guard.sh            — new, accepted-decision/completed-experiment/
-                                           project-field enforcement
-  .githooks/pre-commit, scripts/verify-vault.sh — call check-okf-guard.sh
-  scripts/check-command-pointers.sh     — bridge-* added to its workflow list
-  scripts/test-portability.sh           — 4 new okf-guard regression cases (37 -> 41)
-  docs/phase-3/                         — okf-bridge mapping, status
-  error-tracking/Phase 3 okf-integration*.md — 5th Antigravity round: prompt + report
+Uncommitted:
+  docs/phase-0/baseline-metrics.md   — the six manual metrics, now recorded (see below)
+  .github/workflows/verify-vault.yml — server-side verify-vault.sh run (gap #6, see below)
+  scripts/lint-governance.sh         — Phase 4 OKF + cross-layer lint (§9)
+  scripts/test-lint-governance.sh    — 20 checks for the above
+  docs/phase-4/                      — lint-layers, status, maintenance-log
+  plus this round's doc updates      — verify-vault section 9, prompts/wiki-lint.md,
+                                       .claude/commands/wiki-lint.md, AGENTS.md phase 3 -> 4,
+                                       wiki/log.md, phase-0-report sign-off, phase-3 status,
+                                       portability, the gap triage, this file
 ```
 
-`raw/articles/` itself is now committed (as of `5c5ad09`), not listed above as still-uncommitted —
-that was the actual fix Round 2 needed, see §4. `bash scripts/verify-vault.sh` reports all clear
-as of this writing: enforcement armed, evidence intact and drift-free, lint clean, policy files
-in sync, command pointers intact, schema conformant, no duplicate candidates (7/7). `raw/` is also
-OS-level locked (`chmod 444`) via `scripts/lock-raw.sh`.
+The long-standing "everything is uncommitted, awaiting owner review" state is **over**. Phases 0
+through 3, the portability layer, all seven cross-agent test rounds (six with reports; round 1
+produced only a problems summary — commit `288d4dc`'s message says "five", written before the
+sixth), and both structural
+remediations are committed. `raw/` now holds 19 files under Git plus `.gitkeep`: the 7 original
+pilot articles, the round-3 boundary probe, 10 later notes, and 1 inbox note.
+
+### Phase 0 is finally, fully closed
+
+Both remaining owner items landed on 2026-08-31:
+
+- **Approval model signed off** by shonda_tay@wiwynn.com after reviewing the three tiers and the
+  prohibited list. That was the last of five Phase 0 exit criteria, open since 2026-08-24 because
+  it is a person's understanding rather than a file.
+- **Manual baseline metrics recorded** — 4.5 min to find supporting material, 45 min to produce a
+  synthesis, 12 duplicate notes, 37 notes without sources, 5 decisions without rationale, 40% of
+  experiments concluded. Captured retrospectively and **labelled as estimates where they are
+  estimates**, which is the honest form and still far more useful than the blanks they replaced:
+  Phase 5's "did retrieval actually improve?" now has a before to compare against.
+
+### The one open finding, since closed
+
+`verify-vault.sh` reported **1 problem**: 11 tracked files under `raw/` were writable — the 10
+new notes plus `probe-add-only.md`. That was section 2c working exactly as designed, and the cause
+is a sequencing detail worth remembering: `scripts/lock-raw.sh` applies `chmod a-w` across every
+file it finds under the evidence directory, so running it *before* the notes were committed locked
+nothing that mattered, and committing them afterwards promoted them from "untracked, writable,
+merely noted" to "tracked, writable, hard failure".
+
+**The finding is now clear.** All 20 tracked evidence files carry a read-only mode and
+`verify-vault.sh` reports all clear on every section — 10 printed headers since Phase 4 added the
+advisory governance one; the count read "10 of 10" when the unheaded content-drift subcheck was
+counted as a section — the lock was evidently re-run outside
+this session, since the agent cannot `chmod` under `raw/`. The lesson survives the fix: lock
+*after* committing new evidence, not before.
+
+### Structural gap re-verification (2026-08-31)
+
+`error-tracking/Structural gaps and remediation triage.md` was re-checked against live repo state
+rather than against its own text. Four of six gaps closed — #1 (`9d82218`), #2 and #4 (`cfed428`),
+and #6's observation half, below. #3 (`allowed-tools` seam) and #5 (taxonomy) remain open exactly
+as triaged, which for both is the intended outcome, not a slip.
+
+One verdict was wrong rather than stale-by-a-margin: **#6 was filed as "cannot be fixed here"
+because no remote existed.** One does — `origin` is `github.com/ShunDa002/llm-wiki3`, `main` is
+pushed to it. The original conclusion came from the Phase 3 round's `git push` probe failing, which
+only ever showed "no upstream branch" and was read as "no remote". So the CI remedy the triage
+itself named became available, and `.github/workflows/verify-vault.yml` now runs `verify-vault.sh`
+on every push and pull request, arming `core.hooksPath` and the OS-level lock first because neither
+survives a fresh clone.
+
+It **observes, it does not gate** — GitHub Actions runs after the push lands. Converting it into
+enforcement is owner action on the hosting side; see open item 7.
+
+All four test suites pass: `test-portability`, `test-schema`, `test-wiki-lint`,
+`test-baseline-metrics`. The YAML itself is unvalidated by a parser — no `pyyaml` in this sandbox
+and the install was offline-blocked — so its first real run is the first proof it parses.
+
+### Phase status files re-synced (2026-08-31)
+
+The per-phase docs had drifted from the vault they describe, so each was re-checked against live
+state. `docs/phase-1/status.md` was the serious one: it still read "Blocked: needs sources", listed
+six exit criteria as Blocked, and gave the owner `mkdir raw/articles` instructions — accurate on
+2026-08-24, wrong ever since the 7 sources were ingested. It now records what the vault shows, with
+the original blocker kept as context rather than deleted.
+
+Smaller corrections: Phase 2's `verify-vault.sh` count (7 sections → 10) and its two closed owner
+items; Phase 3's "Known blind spot" marked closed at `9d82218`, its stale check counts (41 → 42,
+8/8 → 10/10), and two open items that the exit-criteria table already contradicted; Phase 0's
+baseline-metrics row and evidence count. Logged as `infra-20260831-002` in `wiki/log.md`.
+
+One counting error surfaced while doing it: this vault has run **six** cross-agent rounds, not five.
+Round 1 produced no report — its canaries were never placed, so there was nothing to report on — and
+several documents, including commit `288d4dc`'s own message, were written before round 6 existed.
 
 ### Open items for the pilot owner
 
-1. Review and commit (or reject) the uncommitted ingest content above.
-2. Sign off on the approval model — the one Phase 0 exit criterion that's a person's
-   understanding, not a file.
-3. Record the manual baseline metrics (time-to-find, time-to-synthesize) — see
-   [phase-0/baseline-metrics.md](phase-0/baseline-metrics.md) — before they become
-   un-recoverable as "before" numbers.
-4. Decide whether to fix the absolute-path gap in `.claude/hooks/protect-raw.sh` itself now that
-   portability work has already touched the equivalent logic elsewhere.
-5. Actually run `/wiki-lint`, `/wiki-ingest`, and `/wiki-query` once each as real slash-command
-   invocations. The pointer refactor (§3a) was verified structurally — file contents, permission
-   coverage, argument-substitution reasoning — but never proven against a live invocation from
-   outside this session. That's the more direct proof and it hasn't happened yet.
-6. Decide what to do with `raw/articles/probe-add-only.md`, the Round 3 test artifact — keep it
-   as a permanent fixture for future re-runs, or remove it (agent policy leaves removal to you).
-7. Re-run `scripts/lock-raw.sh` after committing the ingest content in item 1 — new files land
-   writable until it's re-run, per the limitation recorded in agent-portability.md.
-8. **Phase 2:** supply 13 more sources for the twenty-source exit criterion, and run the 8 manual
-   agent-judgement test cases in [phase-2/schema-test-suite.md](phase-2/schema-test-suite.md) once.
-   Full list in [phase-2/status.md](phase-2/status.md#open-items-for-the-pilot-owner).
-9. **Phase 3:** run a planted-defect `/bridge-impact` drill and a live `/bridge-apply` invocation
-   once each — both built and documented but not yet exercised that way. Full list in
-   [phase-3/status.md](phase-3/status.md#open-items-for-the-pilot-owner).
+1. ~~**Re-run `bash scripts/lock-raw.sh`**~~ — **done.** Every tracked evidence file is read-only
+   and `verify-vault.sh` is all clear. See above for why committing the notes escalated it, and why
+   the lock goes after the commit.
+2. **Decide the scope question on the 11 new notes.** They are Python, Agentic-AI, and sandbox
+   notes: a different domain from the pilot's declared one, and Phase 0 said explicitly to avoid
+   migrating an existing vault during the pilot. Ingesting them would take Phase 2's twenty-source
+   criterion from 7 to 18 and unblock Phase 3's three-syntheses criterion — but widening the pilot
+   domain is an owner decision, not an agent judgement call. `/wiki-ingest` is one source per
+   reviewed transaction, so this is roughly eleven plan-and-approve cycles.
+3. **Decide what to do with `raw//articles/probe-add-only.md`** — keep it as a permanent
+   boundary fixture (recommended; it is what made section 2c fire on something real) or remove it.
+4. **Decide whether to fix `.claude/hooks/protect-raw.sh`.** It still has the absolute-path gap the
+   universal guard closed, and its text heuristic false-positived three times on ordinary
+   read-only and documentation work in a single session. One line of delegation to
+   `scripts/guard-raw-universal.sh` would remove the duplicate heuristic entirely — but it is the
+   live evidence guard, so it wants approval, not initiative.
+5. **Fix the three non-Claude entry-point files** (`GEMINI.md`,
+   `.github/copilot-instructions.md`, `.cursor/rules/vault-policy.mdc`): each names 3 of the 8
+   workflows in `prompts/`. Agent-doable and offered; not yet approved.
+6. **Run the 8 manual agent-judgement cases** in
+   [phase-2/schema-test-suite.md](phase-2/schema-test-suite.md). The agent can run them; they need
+   a human reviewer, which is the part that is still open.
+7. **Record human review time** for the next monthly lint run in
+   [phase-4/maintenance-log.md](phase-4/maintenance-log.md), and confirm lint precision is
+   acceptable. Machine time is measured (4.7 s for the full monthly cadence); the human number is
+   the one that decides whether maintenance is sustainable, and only the owner has it.
+8. **Decide how to handle `project-on-disputed-knowledge` recurring.** True positive, and permanent
+   while the pilot rests on a scoped resolution of a live disagreement: either accept a standing
+   finding, or record the acceptance in a field the check can read — which is a schema change, so
+   owner-only.
+9. **Turn the CI check into a gate.** `.github/workflows/verify-vault.yml` reports but cannot
+   reject a push. Require the `verify-vault` check in branch protection for `main` (GitHub settings,
+   not a file in this repo), or move the same command to a `pre-receive` hook on a remote that
+   supports one. This is the difference between a violation being *seen* and being *stopped* — the
+   remaining half of gap #6.

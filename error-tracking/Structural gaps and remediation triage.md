@@ -1,8 +1,14 @@
 # Structural gaps and remediation triage
 
-Date: 2026-08-31
+Date: 2026-08-31 (re-verified against commit `288d4dc` the same day)
 Scope: the vault's folder structure and enforcement layer as of commit `9d82218`, after Phase 3
 and five rounds of cross-agent (Antigravity / Gemini CLI) boundary testing.
+
+**Re-verification status.** Four of the six gaps are now closed: #1 at `9d82218`, #2 and #4 at
+`cfed428`, and #6's server-side remedy at the commit adding
+`.github/workflows/verify-vault.yml`. #3 and #5 remain open exactly as triaged, which is the
+intended outcome for both. Each section below carries its own verified status; the triage table
+is the summary.
 
 This file records six shortcomings of the current structure and, for each, whether it is worth
 fixing. It is deliberately not a test report: nothing here was found by running a test round.
@@ -33,9 +39,13 @@ during boundary-test round 2.
 **Status: fixed.** Commit `9d82218 Add okf/ guard baseline` tracks the three real OKF pages. The
 guard now has a baseline and is live.
 
-### 2. Two policy files state the same rules and can drift
+### 2. Two policy files state the same rules and can drift — FIXED
 
-`CLAUDE.md` and `AGENTS.md` both contain the full policy text — roughly 130 lines of rules stated
+**Status: fixed.** Commit `cfed428` collapsed the duplication as recommended below. `CLAUDE.md` is
+now 16 lines: one `@AGENTS.md` import plus a note saying it holds no rules of its own.
+`check-policy-sync.sh` was repurposed to guard that the pointer stays a pointer, and passes.
+
+**What was wrong.** `CLAUDE.md` and `AGENTS.md` both contained the full policy text — roughly 130 lines of rules stated
 twice. `scripts/check-policy-sync.sh` checks that ~16 invariant rules and the phase number appear
 in both, but it compares rule *presence*, not wording: it catches a rule that was deleted, not one
 that was reworded into meaning something different.
@@ -55,7 +65,21 @@ and can still fall out of step with the scripts its prompt actually invokes.
 `scripts/check-command-pointers.sh` guards this narrowly — is the command file still a pointer,
 and does `allowed-tools` cover every `bash scripts/*.sh` the prompt calls.
 
-### 4. The OS-level `raw/` lock only covers files that already existed at its last run
+### 4. The OS-level `raw/` lock only covers files that already existed at its last run — FIXED
+
+**Status: fixed.** Commit `cfed428` added section 2c to `scripts/verify-vault.sh`, built exactly as
+prescribed below: it reports and never `chmod`s, and it separates a writable *tracked* file (hard
+failure, a regression) from a writable *untracked* one (a note, the normal pending state). The
+underlying structural property is unchanged — the lock still cannot cover a file that does not
+exist yet — but it is no longer silent, which was the actual defect.
+
+The live finding this section recorded is also cleared. All 20 tracked evidence files now carry a
+read-only mode, `probe-add-only.md` included, and `verify-vault.sh` reports all clear on 10 of 10
+sections. Note the sequencing lesson it produced: the lock script was run *before* the 10 new notes
+were committed, so committing them afterwards promoted them from "untracked, merely noted" to
+"tracked and writable, hard failure". Re-run the lock after adding evidence, not before.
+
+The original finding follows, for the record.
 
 `scripts/lock-raw.sh` applies `chmod 444` to files under `raw/`. It cannot lock a file that does
 not exist yet, and file modes are not Git-tracked, so a new file stays writable until the script is
@@ -63,7 +87,8 @@ re-run and a fresh clone starts fully unlocked. `docs/agent-portability.md` stat
 the part that makes it worse: `verify-vault.sh` does not check permissions, so a skipped
 `lock-raw.sh` is **silent** until a write actually succeeds.
 
-**This is live, not hypothetical.** As of this writing `raw/` holds 11 writable files:
+**This was live, not hypothetical** (all 11 have since been locked; see the status note above). At
+the time of writing the evidence directory held 11 writable files:
 
 | File | Tracked | Meaning |
 |---|---|---|
@@ -84,6 +109,12 @@ This is the "grow the schema only where an observed failure demands it" rule wor
 not an oversight. What it does mean is that the structure has only ever been exercised at very
 small scale: seven sources, one synthesis, one project/decision/experiment triple.
 
+**Still open on re-verification, and the constraint has shifted.** No folder was added, correctly.
+But the evidence directory now holds 19 real files against those same 7 ingested sources — 10
+`notes/`, 1 `inbox/`, and the boundary probe are all uningested. The bottleneck is therefore no
+longer "the agent cannot write evidence"; it is the owner's pending scope decision on whether those
+notes belong to this pilot's domain (`docs/session-summary.md` §8, item 2).
+
 ### 6. An agent with no hooks and no shell reduces the vault to policy text
 
 Every enforcement layer in this repository needs either a hook system or a shell: the Git
@@ -91,18 +122,32 @@ pre-commit hook, `verify-vault.sh`, `guard-raw-universal.sh`, `lock-raw.sh`. Und
 has neither, all of them are unavailable and the vault is protected by `AGENTS.md`'s wording alone.
 `AGENTS.md` says this plainly rather than implying safety that is not there.
 
+**The verdict below is superseded: this is now partly fixable here, and partly fixed.** The reason
+it was filed as unfixable was that no remote existed. One does — `origin` is
+`github.com/ShunDa002/llm-wiki3` and `origin/main` is pushed — so the off-client enforcement this
+gap needs became available. `.github/workflows/verify-vault.yml` now runs `verify-vault.sh` on
+every push and pull request, arming `core.hooksPath` and the OS-level lock first because neither
+survives a fresh clone.
+
+What that does and does not buy: the check runs regardless of what the local agent can do, which is
+the property no other layer has. It **reports, it does not block** — a GitHub Actions run cannot
+reject a push. Turning it into a real gate needs one of two owner actions, neither agent-doable:
+require the check in branch protection on `main`, or move it to a `pre-receive` hook on a remote
+that supports one. Until then a no-hook, no-shell agent can still commit and push a violation; the
+difference is that it can no longer do so unobserved.
+
 ---
 
 ## Triage
 
-| # | Gap | Verdict |
-|---|---|---|
-| 1 | `okf/` guard inert | **Fixed** — one commit, `9d82218` |
-| 2 | Two policy files drift | **Fix** — collapse into one source |
-| 4 | `raw/` lock silently missed | **Fix** — make it loud in `verify-vault.sh` |
-| 3 | `allowed-tools` duplication | **Leave alone** — every fix costs more than the risk |
-| 5 | Taxonomy not filled out | **Leave alone** — not a defect; needs content, not code |
-| 6 | No-hook, no-shell agent | **Cannot be fixed here** — only off-client enforcement helps |
+| # | Gap | Verdict | State at `288d4dc` |
+|---|---|---|---|
+| 1 | `okf/` guard inert | **Fixed** — one commit, `9d82218` | Closed. All three real OKF pages tracked; the guard has a baseline. |
+| 2 | Two policy files drift | **Fix** — collapse into one source | Closed at `cfed428`. `CLAUDE.md` is a 16-line pointer. |
+| 4 | `raw/` lock silently missed | **Fix** — make it loud in `verify-vault.sh` | Closed at `cfed428`, and the 11 live writable files are locked. |
+| 3 | `allowed-tools` duplication | **Leave alone** — every fix costs more than the risk | Open by design. 8 command files, all still thin pointers. |
+| 5 | Taxonomy not filled out | **Leave alone** — not a defect; needs content, not code | Open by design. Still 7 ingested sources; 12 evidence files now await an owner scope call. |
+| 6 | No-hook, no-shell agent | ~~Cannot be fixed here~~ → **partly fixed** | A remote now exists, so CI became possible. `verify-vault.yml` reports on every push; making it *block* is owner action. |
 
 ### Worth fixing
 
@@ -157,7 +202,7 @@ for when to create it. The real constraint behind this gap is sample size — se
 remedy is source material, which only the pilot owner can add because the agent cannot write to
 `raw/` by design. Writing code here would be motion, not progress.
 
-### Cannot be fixed here
+### Was "cannot be fixed here" — the precondition arrived
 
 **#6 — no-hook, no-shell agent.** Nothing added to this repository can help, because the gap is
 precisely the absence of the ability to run what this repository contains. The only real remedy is
@@ -165,10 +210,17 @@ to move enforcement off the client: a `pre-receive` hook on a remote, or a CI jo
 `verify-vault.sh` on push. Server-side enforcement runs regardless of what the local agent can do,
 which is the property none of the current layers have.
 
-That fix is conditional on infrastructure that does not exist yet — the Phase 3 test round's
-`git push` probe failed on a missing upstream branch, so there is no remote configured. If this
-vault stays local, the ceiling stands and `AGENTS.md` documenting it honestly is the correct
-response. If it is ever pushed anywhere, CI becomes the right place to fix this, not the vault.
+That was filed as conditional on infrastructure that did not exist — the Phase 3 test round's
+`git push` probe failed on a missing upstream branch, so the conclusion drawn was "there is no
+remote configured". **That is no longer true**, and it is worth noting how the stale premise
+survived: the probe's failure was read as "no remote", when it only ever showed "no upstream
+branch". A remote is now present and `main` is pushed to it, so the conditional resolved and the
+remedy was built — `.github/workflows/verify-vault.yml`, described in the gap section above.
+
+The ceiling that remains is narrower than the original one. CI observes; it does not gate. Branch
+protection or a `pre-receive` hook is what converts observation into enforcement, and both are
+owner actions on the hosting side, not files in this repository. `AGENTS.md` documenting the
+policy-only mode honestly is still the correct response for an agent that cannot run any of this.
 
 ---
 

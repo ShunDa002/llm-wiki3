@@ -3,8 +3,10 @@
 Canonical, agent-neutral operating policy for the LLM Wiki + OKF pilot vault. This file is the
 single source of truth for *what the rules are*. Read it before any write operation.
 
-Phase: **3 (formal OKF integration)**. Automation level: **2** — the agent proposes plans and
-executes approved ones.
+Phase: **4 (lint, governance, and maintenance)**. Automation level: **2** — the agent proposes
+plans and executes approved ones. Phase 4's plan allows level 3, and this vault has deliberately
+not taken it: no auto-fix is enabled, only documented as eligible. See
+[docs/phase-4/lint-layers.md](docs/phase-4/lint-layers.md#42-fix-policy-by-finding-type).
 
 Read [docs/phase-0/risk-matrix.md](docs/phase-0/risk-matrix.md) before any write operation and
 [docs/phase-0/privacy-policy.md](docs/phase-0/privacy-policy.md) before handling any source.
@@ -14,6 +16,9 @@ exists to stop.
 Read [docs/phase-3/okf-bridge.md](docs/phase-3/okf-bridge.md) before proposing an `okf/` record or
 running a `/bridge-*` workflow — it maps plan types onto what exists and lists exactly which OKF
 fields are agent-editable.
+Read [docs/phase-4/lint-layers.md](docs/phase-4/lint-layers.md) before acting on any lint finding —
+it says which findings the agent may fix after approval, which are owner-only, and which are never
+fixed automatically at any automation level.
 
 > **If you are Claude Code:** `CLAUDE.md` is your entry point, and it is a pointer — it imports
 > this file with `@AGENTS.md` and states no rules of its own. There is one copy of the policy, so
@@ -49,7 +54,7 @@ The workflows are defined agent-neutrally in `prompts/`:
 |---|---|---|
 | ingest | `prompts/wiki-ingest.md` | Integrate one raw source as a reviewed transaction |
 | query | `prompts/wiki-query.md` | Answer from vault knowledge, with citations |
-| lint | `prompts/wiki-lint.md` | Report health findings; never repair |
+| lint | `prompts/wiki-lint.md` | Report health findings across all four layers; never repair |
 | find-duplicates | `prompts/wiki-find-duplicates.md` | Report duplicate candidates; never merge |
 | trace | `prompts/wiki-trace.md` | Walk a claim back to raw evidence; read-only |
 

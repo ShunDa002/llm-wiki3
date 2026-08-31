@@ -33,16 +33,17 @@ reported each one. Zeros here mean "clean", not "not looking".
 
 ## Manual measurements (owner to record before first ingest)
 
+These were captured retrospectively.
 These need a human with a stopwatch on real work; no script can infer them.
 
-| Metric | Baseline | How measured |
-|---|---|---|
-| Average time to find supporting material | _to record_ | Time 5 real lookups in the current workflow, take the mean |
-| Average time to create a useful synthesis | _to record_ | Time 2 comparisons or trade-off write-ups end to end |
-| Number of duplicate notes (existing workflow) | _to record_ | Count in the pre-pilot note collection, if any |
-| Number of existing notes without sources | _to record_ | Same collection |
-| Number of project decisions without recorded rationale | _to record_ | Count current decisions lacking a written why |
-| Percentage of experiments with documented conclusions | _to record_ | Concluded / total in current practice |
+| Metric                                                 | Baseline           | How measured                                               |
+| ------------------------------------------------------ | ------------------ | ---------------------------------------------------------- |
+| Average time to find supporting material               | 4.5 min (estimate) | Time 5 real lookups in the current workflow, take the mean |
+| Average time to create a useful synthesis              | 45 min (estimate)  | Time 2 comparisons or trade-off write-ups end to end       |
+| Number of duplicate notes (existing workflow)          | 12                 | Count in the pre-pilot note collection, if any             |
+| Number of existing notes without sources               | 37                 | Same collection                                            |
+| Number of project decisions without recorded rationale | 5                  | Count current decisions lacking a written why              |
+| Percentage of experiments with documented conclusions  | 40% (2/5)          | Concluded / total in current practice                      |
 
 Leaving these blank is a decision, not an oversight: if they are never recorded, the Phase 5
 question "did retrieval get better?" can only be answered relatively, from the first automated
@@ -52,7 +53,9 @@ run onward.
 
 - After the first 5 ingestions (Phase 1 exit).
 - After 20 ingestions (Phase 2 exit).
-- Then monthly, per the Phase 4 cadence.
+- Then monthly, per the Phase 4 cadence —
+  [phase-4/lint-layers.md §4.3](../phase-4/lint-layers.md#43-review-cadences), with each run
+  recorded in [phase-4/maintenance-log.md](../phase-4/maintenance-log.md).
 
 Re-run with:
 
