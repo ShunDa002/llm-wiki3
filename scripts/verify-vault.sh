@@ -91,6 +91,42 @@ if [ -d "$EVIDENCE_DIR" ] && [ -d wiki/sources ] && [ -f scripts/lib-vault.sh ];
   [ "$drift" -eq 0 ] && pass "no content drift against recorded source_id"
 fi
 
+# --- 2c. OS-level lock still applied? --------------------------------------
+# lock-raw.sh's chmod 444 is not Git-tracked, so it silently does not survive a clone, and a file
+# added after the last run stays writable. Before this section a skipped lock-raw.sh was invisible
+# until a write actually succeeded — a control that has quietly stopped applying is worse than one
+# known to be absent, because it is still trusted.
+#
+# Report, never chmod: this script is a read-only verifier, and a verifier that repairs its own
+# findings can no longer be trusted to report them.
+#
+# Tracked vs untracked is split deliberately. Committed evidence is supposed to be frozen, so a
+# writable tracked file is a regression and fails. A newly added file is legitimately pending —
+# the owner adds, then locks — so it is only noted. Failing on the normal case is how a check
+# teaches its operator to switch it off, the same reasoning that keeps §7 advisory.
+if [ -d "$EVIDENCE_DIR" ]; then
+  echo
+  echo "-- OS-level lock ($EVIDENCE_DIR/) --"
+  unlocked_tracked=""; unlocked_new=0
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+      unlocked_tracked="$unlocked_tracked$path"$'\n'
+    else
+      unlocked_new=$((unlocked_new + 1))
+    fi
+  done < <(find "$EVIDENCE_DIR" -type f -perm -u+w 2>/dev/null)
+
+  if [ -n "$unlocked_tracked" ]; then
+    fail "committed evidence is writable — the OS-level lock is not applied:"
+    printf '%s' "$unlocked_tracked" | sed 's/^/      /'
+    note "fix: bash scripts/lock-raw.sh"
+  else
+    pass "all committed evidence is read-only"
+  fi
+  [ "$unlocked_new" -gt 0 ] && note "$unlocked_new new uncommitted file(s) still writable — lock after review: bash scripts/lock-raw.sh"
+fi
+
 # --- 3. structural lint ----------------------------------------------------
 echo
 echo "-- structural lint --"
@@ -108,12 +144,12 @@ fi
 
 # --- 4. policy files in agreement -----------------------------------------
 echo
-echo "-- policy consistency --"
+echo "-- policy single-sourcing --"
 if [ -f scripts/check-policy-sync.sh ]; then
   if sync_out=$(bash scripts/check-policy-sync.sh 2>&1); then
-    pass "AGENTS.md and CLAUDE.md agree on invariant rules"
+    pass "CLAUDE.md imports AGENTS.md, which holds every invariant rule"
   else
-    fail "policy files disagree:"
+    fail "policy pointer or canonical file problem:"
     printf '%s\n' "$sync_out" | sed 's/^/      /'
   fi
 else
@@ -162,6 +198,20 @@ if [ -f scripts/find-duplicates.sh ]; then
   fi
 else
   note "scripts/find-duplicates.sh not found — skipping"
+fi
+
+# --- 8. OKF semantic protection (Phase 3) ---------------------------------
+echo
+echo "-- OKF semantic protection --"
+if [ -f scripts/check-okf-guard.sh ]; then
+  if okf_out=$(bash scripts/check-okf-guard.sh --worktree 2>&1); then
+    pass "no unauthorized change to an accepted decision, a completed experiment, or a project's protected fields"
+  else
+    fail "OKF semantic-immutability findings:"
+    printf '%s\n' "$okf_out" | grep -vE '^$' | sed 's/^/      /'
+  fi
+else
+  note "scripts/check-okf-guard.sh not found — skipping"
 fi
 
 echo

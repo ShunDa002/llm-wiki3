@@ -17,7 +17,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-WORKFLOWS="wiki-ingest wiki-query wiki-lint wiki-find-duplicates wiki-trace"
+WORKFLOWS="wiki-ingest wiki-query wiki-lint wiki-find-duplicates wiki-trace bridge-apply bridge-impact bridge-promote"
 problems=0
 report() { printf 'PROBLEM: %s\n' "$1"; problems=$((problems + 1)); }
 

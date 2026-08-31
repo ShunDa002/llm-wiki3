@@ -67,7 +67,7 @@ and `CLAUDE.md` contain policy text.
 
 | Agent | File | Status |
 |---|---|---|
-| Claude Code | `CLAUDE.md` | **Pre-existing, unmodified.** Still the live setup. |
+| Claude Code | `CLAUDE.md` | **Pointer.** Imports `AGENTS.md` with `@AGENTS.md`; states no rules of its own. |
 | Codex CLI, and most agents following the convention | `AGENTS.md` | Added. Canonical policy. |
 | Gemini CLI | `GEMINI.md` | Added, pointer. |
 | GitHub Copilot | `.github/copilot-instructions.md` | Added, pointer. |
@@ -85,7 +85,13 @@ Verified by running it here:
   of real evidence through. Two more regression cases in `test-portability.sh`.
 - `guard-raw-universal.sh` denies and allows correctly across path, command, and JSON modes,
   including tool names used by Claude, Codex, and Gemini.
-- `check-policy-sync.sh` detects a removed invariant rule.
+- `check-policy-sync.sh` detects a rule removed from the canonical `AGENTS.md`, a missing
+  `@AGENTS.md` import in `CLAUDE.md`, and `CLAUDE.md` re-grown into a second policy copy.
+- **The `@AGENTS.md` import itself resolves.** Confirmed in a fresh session: `/memory` lists
+  `AGENTS.md` as loaded, and the agent answered a question whose content exists only in
+  `AGENTS.md` (the no-hook-system guidance) with no tool call, attributing it to that file. The
+  duplication was not removed until this was proven, precisely because it could not be tested
+  from inside a running session.
 - Committed hook mode is `100755` and survives a clone.
 - **Against a real non-Claude agent, not just the test suite:** three rounds of adversarial
   testing against Antigravity (Gemini CLI), prompts and reports kept in `error-tracking/`.
@@ -196,11 +202,14 @@ legitimate work teaches the operator to route around it, which is worse than no 
    check is what covers that window once the file is ingested and has a recorded `source_id`.
    File permissions also aren't Git-tracked, so a fresh clone starts unlocked — re-run
    `lock-raw.sh` after every clone, same as arming `core.hooksPath`.
-2. **Two policy files can drift.** `CLAUDE.md` could not become a pointer to `AGENTS.md` without
-   editing it, and the instruction was to leave it alone. So the same rules exist twice.
-   `scripts/check-policy-sync.sh` checks that ~16 invariant rules and the phase number appear in
-   both, and `verify-vault.sh` runs it. It compares rules, not prose — wording may differ freely.
-   It will not catch a *changed* rule that keeps its keyword.
+2. **The pointer must stay a pointer.** Policy text lives in exactly one file now — `CLAUDE.md`
+   imports `AGENTS.md` and states no rules — so the two can no longer disagree. What replaced the
+   drift risk is a smaller one: someone pastes the rules back into `CLAUDE.md`, or the import line
+   goes missing and a Claude Code session silently loads no policy at all.
+   `scripts/check-policy-sync.sh` guards both (import present, line-count cap, no invariant rule
+   pattern appearing in `CLAUDE.md`, every rule still present in `AGENTS.md`), and
+   `verify-vault.sh` runs it. It still does not catch a rule *reworded* into meaning something
+   different — that remains a human review job, in one file instead of two.
 3. **`.claude/commands/*.md`'s `allowed-tools` list can still fall out of step** with what
    `prompts/*.md` actually invokes — the one seam the pointer refactor couldn't remove, since
    Claude's permission syntax has no equivalent to unify against. `check-command-pointers.sh`
@@ -230,9 +239,9 @@ scripts/guard-raw-universal.sh     reusable pre-tool guard core
 scripts/verify-vault.sh            agent-independent verification + content-drift check
 scripts/lock-raw.sh                OS-level chmod 444 lock for tracked raw/ files
 scripts/lib-vault.sh               added recorded_source_id() helper, shared by the two above
-scripts/check-policy-sync.sh       policy-drift detector (AGENTS.md vs CLAUDE.md)
+scripts/check-policy-sync.sh       pointer-integrity + canonical-completeness check (CLAUDE.md -> AGENTS.md)
 scripts/check-command-pointers.sh  command-pointer drift detector (commands vs prompts)
-scripts/test-portability.sh        self-check for all of the above, 37 checks
+scripts/test-portability.sh        self-check for all of the above, 42 checks
 docs/agent-portability.md          this file
 error-tracking/                    Antigravity test prompts and reports, 3 rounds
 ```
@@ -247,9 +256,14 @@ Everything above is new **except**:
   than being added whole.
 - `.claude/settings.json`, where `Bash(git commit:*)` moved from `ask` to `deny` after testing
   showed a mutated `raw/` file could reach a real commit — see the content-drift section above.
+- `CLAUDE.md`, reduced from a full second copy of the policy to an `@AGENTS.md` import plus a note
+  saying so. The "do not modify CLAUDE.md" constraint that forced the duplication had already
+  lapsed — Phase 2 and Phase 3 both edited the file — so the cost was being paid for a rule no
+  longer in force. `scripts/check-policy-sync.sh` was repurposed rather than deleted: its old job
+  (do the rules appear in both files?) became meaningless, its new job is guarding that the
+  pointer stays a pointer.
 
-No other pre-existing file was touched. Verify with `git diff` against any commit before this
-restructuring — every other path is unchanged.
+Every other pre-existing path is unchanged.
 
 ## Considered and skipped: an Antigravity-specific permission file, and a patch-only workflow
 

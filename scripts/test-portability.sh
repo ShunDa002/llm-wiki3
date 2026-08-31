@@ -125,26 +125,199 @@ trap 'rm -r -- "$tmp"' EXIT
   else
     echo "FAIL pre-commit: blocked a normal wiki change"; exit 3
   fi
+
+  # Content-drift regression: a raw/ file mutated BEFORE its first-ever commit reports as
+  # "Added", not "Modified" — the MDRCT check above cannot see it. This is exactly what let
+  # commit f38689b through against the real vault. Cover both directions: tampered content
+  # must be blocked even though git calls it an add; already-correct content must still be
+  # allowed to be committed late (the normal case — the pilot owner catching up on real evidence).
+  mkdir -p scripts wiki/sources
+  cp "$root/scripts/lib-vault.sh" scripts/lib-vault.sh
+  good_hash=$(printf 'legitimate evidence\n' | sha256sum | cut -d' ' -f1)
+  cat > wiki/sources/c.md <<SRC
+---
+title: Source - C
+type: source
+raw_file: "[[raw/articles/c]]"
+source_id: $good_hash
+---
+SRC
+  git add -A && git commit -q -m "ingest source c (page only — raw/articles/c.md not committed yet)"
+
+  # raw/articles/c.md has never been committed, so this first commit reports as "Added", not
+  # "Modified" — exactly the shape that let commit f38689b through against the real vault.
+  printf 'TAMPERED before first commit\n' > raw/articles/c.md
+  git add -A
+  if git commit -q -m "first commit of tampered c" 2>/dev/null; then
+    echo "FAIL pre-commit: allowed a drifted file through as a plain 'Added' file"; exit 3
+  else
+    echo "ok   pre-commit: blocks content drift even when git reports it as 'Added'"
+  fi
+  git restore --staged -- raw/ 2>/dev/null || true
+  rm -f raw/articles/c.md
+
+  printf 'legitimate evidence\n' > raw/articles/c.md
+  git add -A
+  if git commit -q -m "first commit of untouched c" 2>/dev/null; then
+    echo "ok   pre-commit: allows the first commit of content that matches its recorded hash"
+  else
+    echo "FAIL pre-commit: blocked a late-but-correct first commit"; exit 3
+  fi
 ) || fail=1
 
-# --------------------------------------------------- policy drift detection
-# Real files must currently agree.
-if bash "$here/check-policy-sync.sh" >/dev/null 2>&1; then
-  ok "policy sync: live files agree"
-else
-  bad "policy sync: live AGENTS.md / CLAUDE.md disagree"
-fi
+# ------------------------------------------------- OKF semantic guard, real git repo (Phase 3)
+tmp2=$(mktemp -d)
+trap 'rm -rf -- "$tmp" "$tmp2"' EXIT
+(
+  cd "$tmp2" || exit 1
+  git init -q .
+  git config user.email t@t.t; git config user.name t
+  mkdir -p .githooks okf/decisions okf/experiments okf/projects scripts
+  cp "$root/.githooks/pre-commit" .githooks/pre-commit
+  chmod +x .githooks/pre-commit
+  cp "$root/scripts/check-okf-guard.sh" scripts/check-okf-guard.sh
+  cp "$root/scripts/lib-vault.sh" scripts/lib-vault.sh
+  git config core.hooksPath .githooks
 
-# And the detector must actually fire on planted drift, or it is decoration.
+  cat > okf/decisions/d.md <<'EOF'
+---
+title: D
+type: decision
+status: accepted
+---
+# D
+EOF
+  cat > okf/experiments/e.md <<'EOF'
+---
+title: E
+type: experiment
+status: complete
+---
+## Conclusion
+Final.
+EOF
+  cat > okf/projects/p.md <<'EOF'
+---
+title: P
+type: project
+status: active
+owner: alice
+started: 2026-01-01
+review_date: 2026-06-01
+---
+## Status notes
+EOF
+  git add -A && git commit -q -m init
+
+  # Editing an accepted decision must be blocked.
+  printf '\nMore.\n' >> okf/decisions/d.md
+  git add -A
+  if git commit -q -m "edit accepted decision" 2>/dev/null; then
+    echo "FAIL okf-guard: allowed editing an accepted decision"; exit 3
+  else
+    echo "ok   okf-guard: blocks editing an accepted decision"
+  fi
+  git reset -q --hard HEAD
+
+  # Editing a completed experiment's conclusion must be blocked.
+  # Portable in-place edit: BSD/macOS sed requires an argument to -i, GNU sed forbids one.
+  # A portability suite that is not itself portable is the joke that writes itself.
+  sed 's/Final\./Changed./' okf/experiments/e.md > e.tmp && mv e.tmp okf/experiments/e.md
+  git add -A
+  if git commit -q -m "edit completed experiment" 2>/dev/null; then
+    echo "FAIL okf-guard: allowed editing a completed experiment"; exit 3
+  else
+    echo "ok   okf-guard: blocks editing a completed experiment"
+  fi
+  git reset -q --hard HEAD
+
+  # Changing a project's protected field (status) must be blocked.
+  sed 's/status: active/status: paused/' okf/projects/p.md > p.tmp && mv p.tmp okf/projects/p.md
+  git add -A
+  if git commit -q -m "change project status" 2>/dev/null; then
+    echo "FAIL okf-guard: allowed changing a project's status field"; exit 3
+  else
+    echo "ok   okf-guard: blocks changing a project's protected field"
+  fi
+  git reset -q --hard HEAD
+
+  # Appending a status note (no protected field touched) must be allowed — the negative case,
+  # so this check can't quietly start blocking legitimate work.
+  printf '\n- 2026-08-30 — noted.\n' >> okf/projects/p.md
+  git add -A
+  if git commit -q -m "append status note" 2>/dev/null; then
+    echo "ok   okf-guard: allows appending a status note"
+  else
+    echo "FAIL okf-guard: blocked a legitimate status-note append"; exit 3
+  fi
+) || fail=1
+
+# --------------------------- verify-vault 2c: OS-level lock check, real git repo
+tmp3=$(mktemp -d)
+trap 'rm -rf -- "$tmp" "$tmp2" "$tmp3"' EXIT
+(
+  cd "$tmp3" || exit 1
+  git init -q .
+  git config user.email t@t.t; git config user.name t
+  mkdir -p scripts raw/articles
+  cp "$root/scripts/verify-vault.sh" scripts/verify-vault.sh
+  cp "$root/scripts/lib-vault.sh" scripts/lib-vault.sh
+  printf 'evidence\n' > raw/articles/a.md
+  git add -A && git commit -q -m init
+
+  # Capability probe first. On a filesystem that cannot represent a cleared write bit, every file
+  # reads as writable and the check under test has nothing to detect — a "pass" there would be a
+  # lie. A test that cannot represent its own precondition must say so, not pass quietly.
+  chmod 444 raw/articles/a.md
+  if [ -w raw/articles/a.md ]; then
+    echo "skip verify-vault 2c: filesystem cannot clear the write bit — check not exercised"
+    exit 0
+  fi
+
+  # Committed evidence left writable must be reported. Only this section's line is asserted on:
+  # the throwaway repo has no wiki-lint or policy files, so other sections legitimately fail.
+  chmod u+w raw/articles/a.md
+  out=$(bash scripts/verify-vault.sh 2>&1)
+  case "$out" in
+    *"committed evidence is writable"*) : ;;
+    *) echo "FAIL verify-vault 2c: a writable committed evidence file was not reported"; exit 3 ;;
+  esac
+
+  # And it must clear once locked, or the finding is noise the operator learns to ignore.
+  chmod 444 raw/articles/a.md
+  out=$(bash scripts/verify-vault.sh 2>&1)
+  case "$out" in
+    *"all committed evidence is read-only"*)
+      echo "ok   verify-vault 2c: reports writable committed evidence, clears once locked" ;;
+    *) echo "FAIL verify-vault 2c: still reporting a finding after the lock was applied"; exit 3 ;;
+  esac
+) || fail=1
+
+# --------------------------------------------------- policy pointer integrity
+# The two old cases here planted drift between two policy copies. There is one copy now, so that
+# plant plants nothing. These are the two failures that replaced it, and both are silent in a way
+# the old drift was not: a missing import means a Claude Code session loads NO policy, and a
+# re-grown CLAUDE.md means the vault is quietly back to two sources that can disagree.
+# The live-files assertion moved to verify-vault.sh, which runs this checker on every invocation.
+
+# 1. The @AGENTS.md import line removed from CLAUDE.md must be detected.
 d=$(mktemp -d)
 mkdir -p "$d/scripts"
 cp "$here/check-policy-sync.sh" "$d/scripts/"
 cp "$root/AGENTS.md" "$d/AGENTS.md"
-grep -v 'Never delete files' "$root/CLAUDE.md" > "$d/CLAUDE.md"
+grep -vxF '@AGENTS.md' "$root/CLAUDE.md" > "$d/CLAUDE.md"
 if (cd "$d" && bash scripts/check-policy-sync.sh >/dev/null 2>&1); then
-  bad "policy sync: did NOT detect a removed invariant rule"
+  bad "policy pointer: did NOT detect a missing @AGENTS.md import"
 else
-  ok "policy sync: detects a removed invariant rule"
+  ok "policy pointer: detects a missing @AGENTS.md import"
+fi
+
+# 2. CLAUDE.md re-grown into a full policy copy must be detected, import line or not.
+{ cat "$root/AGENTS.md"; printf '%s\n' '@AGENTS.md'; } > "$d/CLAUDE.md"
+if (cd "$d" && bash scripts/check-policy-sync.sh >/dev/null 2>&1); then
+  bad "policy pointer: did NOT detect CLAUDE.md re-grown into a second policy copy"
+else
+  ok "policy pointer: detects CLAUDE.md re-grown into a second policy copy"
 fi
 rm -r -- "$d"
 

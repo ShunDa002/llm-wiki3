@@ -49,4 +49,56 @@ EOF
   exit 1
 fi
 
+# Content-drift check: the MDRCT check above is blind the first time a raw/ file is committed,
+# because git has no prior tracked version to call a "modification" — it reports a plain "Added"
+# file even if that file was mutated before ever being committed. This closes that gap using the
+# source_id already recorded on the matching wiki/sources/ page, if one exists: a file that was
+# ingested before it was ever committed still has a known-good hash to drift-check against.
+if [ -f scripts/lib-vault.sh ]; then
+  . scripts/lib-vault.sh
+  drift=""
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    recorded=$(recorded_source_id "$path")
+    [ -n "$recorded" ] || continue
+    staged=$(git cat-file -p ":$path" 2>/dev/null | sha256sum | cut -d' ' -f1)
+    if [ "$staged" != "$recorded" ]; then
+      drift="${drift}  $path (recorded source_id: $recorded, staged content hashes to: $staged)
+"
+    fi
+  done < <(git diff --cached --name-only --diff-filter=ACMR "$base" -- "$EVIDENCE_DIR")
+
+  if [ -n "$drift" ]; then
+    cat >&2 <<EOF
+COMMIT BLOCKED — evidence content drift
+
+The following staged $EVIDENCE_DIR/ file(s) no longer match the source_id already recorded
+against them in wiki/sources/, even though git reports them as newly added rather than modified:
+
+$drift
+This happens when a file is mutated before its first commit — git then has no tracked prior
+version to compare against, and the modify/delete/rename check above cannot see it.
+
+If this was an agent error:
+  git restore --staged --worktree -- $EVIDENCE_DIR/
+
+If the pilot owner genuinely intends this, bypass deliberately and on the record:
+  git commit --no-verify
+
+Nothing has been committed.
+EOF
+    exit 1
+  fi
+fi
+
+# OKF semantic-immutability check (Phase 3, plan §3.6): accepted decisions, completed
+# experiments, and a project's status/owner/dates are not agent-editable. Separate script,
+# same bypass philosophy as above — see scripts/check-okf-guard.sh.
+if [ -f scripts/check-okf-guard.sh ]; then
+  if ! okf_out=$(bash scripts/check-okf-guard.sh --staged 2>&1); then
+    printf '%s\n' "$okf_out" >&2
+    exit 1
+  fi
+fi
+
 exit 0

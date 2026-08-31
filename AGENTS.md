@@ -3,18 +3,22 @@
 Canonical, agent-neutral operating policy for the LLM Wiki + OKF pilot vault. This file is the
 single source of truth for *what the rules are*. Read it before any write operation.
 
-Phase: **2 (schema stabilization and quality control)**. Automation level: **2** — the agent
-proposes plans and executes approved ones.
+Phase: **3 (formal OKF integration)**. Automation level: **2** — the agent proposes plans and
+executes approved ones.
 
 Read [docs/phase-0/risk-matrix.md](docs/phase-0/risk-matrix.md) before any write operation and
 [docs/phase-0/privacy-policy.md](docs/phase-0/privacy-policy.md) before handling any source.
 Read [docs/phase-2/page-taxonomy.md](docs/phase-2/page-taxonomy.md) before creating any page — it
 decides which page type a thing is, and picking the wrong one is the fragmentation failure Phase 2
 exists to stop.
+Read [docs/phase-3/okf-bridge.md](docs/phase-3/okf-bridge.md) before proposing an `okf/` record or
+running a `/bridge-*` workflow — it maps plan types onto what exists and lists exactly which OKF
+fields are agent-editable.
 
-> **If you are Claude Code:** `CLAUDE.md` is your entry point and says the same thing. The two
-> files are kept in agreement by `scripts/check-policy-sync.sh`. If they ever disagree, **this
-> file wins** and the drift is a defect to report, not a choice to make.
+> **If you are Claude Code:** `CLAUDE.md` is your entry point, and it is a pointer — it imports
+> this file with `@AGENTS.md` and states no rules of its own. There is one copy of the policy, so
+> the two files cannot disagree. `scripts/check-policy-sync.sh` guards that the import is intact
+> and that `CLAUDE.md` has not re-grown policy text; add a rule here, never there.
 
 ---
 
@@ -57,6 +61,16 @@ Each declares its own minimum tool set; do not reach past it.
 - The agent may propose new records.
 - The agent may not change goals, commitments, owners, dates, or accepted decisions without
   explicit approval.
+- Bridge workflows, also agent-neutral, defined in `prompts/`:
+
+| Workflow | Definition | Purpose |
+|---|---|---|
+| bridge-apply | `prompts/bridge-apply.md` | Link a synthesis to a project or proposed decision; plan first |
+| bridge-impact | `prompts/bridge-impact.md` | Report which OKF records a changed Wiki page affects; read-only |
+| bridge-promote | `prompts/bridge-promote.md` | Propose promoting an experiment's lesson to a synthesis; read-only, proposes only |
+
+  `scripts/check-okf-guard.sh` is the portable backstop for the "no accepted decision, no
+  approval" rule above — see [Enforcement by agent](#enforcement-by-agent).
 
 ## General
 
@@ -127,6 +141,7 @@ system, and some have none. Know which layer is actually protecting you before y
 | Path permission rules | `.claude/settings.json` `permissions.deny` | Claude Code only |
 | Pre-tool-call guard | `.claude/hooks/protect-raw.sh` | Claude Code only |
 | Reusable guard core | `scripts/guard-raw-universal.sh` (CLI flags or JSON on stdin) | Any agent with a pre-tool hook that can shell out |
+| OKF semantic guard | `.githooks/pre-commit` calls `scripts/check-okf-guard.sh` — blocks an accepted decision, a completed experiment, or a project's status/owner/dates from being committed as agent-changed | **Any agent, any editor, any human** — same portable backstop as the raw/ hook |
 
 **Enable the portable layer once per clone** (it is not on by default — Git will not run hooks
 from a tracked directory unless told to):
